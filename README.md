@@ -4,6 +4,14 @@
 
 *Submitted to Starknet Re{Solve} Hackathon - Bitcoin Track*
 
+## 🎥 Demo Video
+**[Watch Demo on YouTube](YOUR_YOUTUBE_LINK_HERE)** - 3-minute walkthrough of the complete BTCUSD experience
+
+## 🔗 Links
+- **GitHub Repository**: https://github.com/kyisaiah47/btcusd-stablecoin
+- **Live Demo**: [iOS Simulator Demo]
+- **Devpost Submission**: [Pending Upload]
+
 ## 🚀 Overview
 
 BTCUSD is a revolutionary Bitcoin-backed stablecoin that combines the security of Bitcoin with the scalability of Starknet. Users deposit Bitcoin via the Atomiq bridge, mint BTCUSD at a 66.67% LTV ratio, and automatically earn yield through Vesu protocol integration.
