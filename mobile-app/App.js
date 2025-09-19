@@ -111,14 +111,17 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
 
-      <LinearGradient
-        colors={['#FF6B35', '#F7931E', '#FFD700']}
-        style={styles.header}
-      >
-        <Text style={styles.headerTitle}>BTCUSD</Text>
-        <Text style={styles.headerSubtitle}>Bitcoin-Backed Stablecoin</Text>
-        <Text style={styles.headerTagline}>Powered by Starknet + Vesu</Text>
-      </LinearGradient>
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.logoContainer}>
+            <View style={styles.logo}>
+              <Text style={styles.logoText}>₿</Text>
+            </View>
+            <Text style={styles.headerTitle}>BTCUSD</Text>
+          </View>
+          <Text style={styles.headerSubtitle}>Bitcoin-Backed Stablecoin</Text>
+        </View>
+      </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 
@@ -129,12 +132,12 @@ export default function App() {
               Use Braavos wallet for seamless Bitcoin integration
             </Text>
             <TouchableOpacity
-              style={styles.connectButton}
+              style={[styles.connectButton, loading && styles.connectButtonLoading]}
               onPress={connectWallet}
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color="#000" />
               ) : (
                 <Text style={styles.connectButtonText}>Connect Braavos Wallet</Text>
               )}
@@ -143,7 +146,7 @@ export default function App() {
         ) : (
           <>
             {/* User Position Card */}
-            <View style={styles.card}>
+            <View style={[styles.card, styles.firstCard]}>
               <Text style={styles.cardTitle}>Your Position</Text>
               <View style={styles.positionRow}>
                 <Text style={styles.positionLabel}>Collateral (wBTC)</Text>
@@ -263,163 +266,199 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#0A0A0A',
   },
   header: {
+    backgroundColor: '#111111',
     paddingTop: 50,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1A1A1A',
+  },
+  headerContent: {
+    paddingHorizontal: 24,
+  },
+  logoContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
+  },
+  logo: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#F7931E',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  logoText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000',
   },
   headerTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.3)',
-    textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 4,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
-    fontSize: 16,
-    color: '#fff',
-    marginTop: 5,
-    opacity: 0.9,
-  },
-  headerTagline: {
-    fontSize: 12,
-    color: '#fff',
-    marginTop: 5,
-    opacity: 0.7,
+    fontSize: 15,
+    color: '#A0A0A0',
+    fontWeight: '500',
   },
   content: {
     flex: 1,
-    padding: 20,
+    backgroundColor: '#0A0A0A',
   },
   connectSection: {
+    padding: 24,
     alignItems: 'center',
-    marginTop: 50,
+    marginTop: 40,
   },
   sectionTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   sectionSubtitle: {
     fontSize: 16,
-    color: '#999',
+    color: '#A0A0A0',
     textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 22,
+    marginBottom: 32,
+    lineHeight: 24,
+    fontWeight: '500',
   },
   connectButton: {
-    backgroundColor: '#FF6B35',
-    paddingVertical: 15,
-    paddingHorizontal: 40,
-    borderRadius: 25,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
     minWidth: 200,
     alignItems: 'center',
   },
   connectButtonText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   card: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 20,
+    backgroundColor: '#111111',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 24,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#333',
+    borderColor: '#1A1A1A',
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 15,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 20,
+    letterSpacing: -0.3,
   },
   positionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    alignItems: 'center',
+    marginBottom: 12,
   },
   positionLabel: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 15,
+    color: '#A0A0A0',
+    fontWeight: '500',
   },
   positionValue: {
-    fontSize: 14,
-    color: '#fff',
+    fontSize: 15,
+    color: '#FFFFFF',
     fontWeight: '600',
   },
   yieldContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    padding: 20,
+    backgroundColor: '#0A0A0A',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1A1A1A',
   },
   yieldAmount: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#4CAF50',
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#00D4AA',
+    letterSpacing: -1,
   },
   yieldLabel: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 5,
+    fontSize: 14,
+    color: '#A0A0A0',
+    marginTop: 4,
+    fontWeight: '500',
   },
   inputLabel: {
-    fontSize: 14,
-    color: '#fff',
+    fontSize: 15,
+    color: '#FFFFFF',
     marginBottom: 8,
+    fontWeight: '600',
   },
   input: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 10,
-    padding: 15,
+    backgroundColor: '#0A0A0A',
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
-    color: '#fff',
+    color: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#444',
-    marginBottom: 15,
+    borderColor: '#2A2A2A',
+    marginBottom: 16,
+    fontWeight: '500',
   },
   previewContainer: {
-    backgroundColor: '#0a2a1a',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
+    backgroundColor: '#0A1A0F',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: '#00D4AA',
   },
   previewText: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: '#00D4AA',
     fontWeight: '600',
   },
   previewSubtext: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 5,
+    fontSize: 14,
+    color: '#A0A0A0',
+    marginTop: 4,
+    fontWeight: '500',
   },
   actionButton: {
-    backgroundColor: '#FF6B35',
-    paddingVertical: 15,
-    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
   },
   actionButtonText: {
-    color: '#fff',
+    color: '#000000',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   featureItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    padding: 16,
+    backgroundColor: '#0A0A0A',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1A1A1A',
   },
   featureIcon: {
-    fontSize: 24,
-    marginRight: 15,
-    width: 30,
+    fontSize: 20,
+    marginRight: 16,
+    marginTop: 2,
   },
   featureContent: {
     flex: 1,
@@ -427,12 +466,20 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
-    marginBottom: 2,
+    color: '#FFFFFF',
+    marginBottom: 4,
+    letterSpacing: -0.2,
   },
   featureDescription: {
-    fontSize: 12,
-    color: '#999',
-    lineHeight: 16,
+    fontSize: 14,
+    color: '#A0A0A0',
+    lineHeight: 20,
+    fontWeight: '500',
+  },
+  firstCard: {
+    marginTop: 24,
+  },
+  connectButtonLoading: {
+    opacity: 0.7,
   },
 });
