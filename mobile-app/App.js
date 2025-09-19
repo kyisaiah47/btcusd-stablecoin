@@ -212,12 +212,12 @@ export default function App() {
               )}
 
               <TouchableOpacity
-                style={styles.actionButton}
+                style={[styles.actionButton, (loading || !btcAmount) && styles.actionButtonDisabled]}
                 onPress={depositAndMint}
                 disabled={loading || !btcAmount}
               >
                 {loading ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#000" />
                 ) : (
                   <Text style={styles.actionButtonText}>Deposit & Mint</Text>
                 )}
@@ -481,5 +481,8 @@ const styles = StyleSheet.create({
   },
   connectButtonLoading: {
     opacity: 0.7,
+  },
+  actionButtonDisabled: {
+    opacity: 0.6,
   },
 });
