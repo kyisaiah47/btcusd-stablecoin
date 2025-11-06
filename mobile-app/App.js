@@ -224,7 +224,7 @@ export default function App() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#000" />
+                <ActivityIndicator color="#FFF" />
               ) : (
                 <Text style={styles.connectButtonText}>
                   {showKeyInput ? 'Connect' : 'Connect Wallet'}
@@ -233,10 +233,21 @@ export default function App() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              style={[styles.testButton, {marginTop: 12}]}
+              onPress={() => {
+                // Testnet account private key (TESTNET ONLY!)
+                setPrivateKey('0x73afc4afd35d0e903ed04fe110b3b33590d7daf30c810f64797c8ea8caabd3d6');
+                setShowKeyInput(true);
+              }}
+            >
+              <Text style={styles.testButtonText}>🧪 Use Test Account</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
               style={[styles.secondaryButton, {marginTop: 12}]}
               onPress={checkContractInfo}
             >
-              <Text style={styles.secondaryButtonText}>View Contract Info</Text>
+              <Text style={styles.secondaryButtonText}>View Contract Info (No Login)</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -506,6 +517,17 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#A5B4FC',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  testButton: {
+    backgroundColor: '#FCD34D',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+  },
+  testButtonText: {
+    color: '#000000',
     fontSize: 14,
     fontWeight: '600',
   },
