@@ -1,0 +1,21 @@
+# Build artifacts
+target/
+
+# Scarb
+Scarb.lock
+
+# Node modules
+node_modules/
+mobile-app/node_modules/
+
+# Environment
+.env
+
+# OS
+.DS_Store
+
+# Wallet files (NEVER commit private keys)
+*.json
+!package.json
+!tsconfig.json
+!deployed_address.txt

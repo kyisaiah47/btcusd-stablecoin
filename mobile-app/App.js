@@ -16,11 +16,11 @@ import { Contract, RpcProvider, Account } from 'starknet';
 
 const { width, height } = Dimensions.get('window');
 
-// Mock contract addresses (replace with actual deployed addresses)
+// Deployed testnet contract addresses
 const CONTRACTS = {
-  VAULT: '0x123...',
-  TOKEN: '0x456...',
-  WBTC: '0x789...'
+  VAULT: '0x069818be022a2633500ba32c398280c2f49f19b881f9c3952d3d164df93bfd4e', // BTCUSD Demo Contract
+  TOKEN: '0x069818be022a2633500ba32c398280c2f49f19b881f9c3952d3d164df93bfd4e', // Same contract (has token functions)
+  WBTC: '0x789...' // To be replaced when integrated
 };
 
 export default function App() {
@@ -32,9 +32,9 @@ export default function App() {
   const [userPosition, setUserPosition] = useState(null);
   const [yieldEarned, setYieldEarned] = useState('0');
 
-  // Initialize Starknet provider
+  // Initialize Starknet provider (Sepolia testnet)
   const provider = new RpcProvider({
-    nodeUrl: 'https://starknet-mainnet.public.blastapi.io'
+    nodeUrl: 'https://starknet-sepolia-rpc.publicnode.com'
   });
 
   const connectWallet = async () => {

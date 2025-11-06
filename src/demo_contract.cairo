@@ -1,6 +1,18 @@
+use starknet::ContractAddress;
+
+#[starknet::interface]
+trait IDemoBTCUSD<TContractState> {
+    fn name(self: @TContractState) -> felt252;
+    fn symbol(self: @TContractState) -> felt252;
+    fn total_supply(self: @TContractState) -> u256;
+    fn balance_of(self: @TContractState, account: ContractAddress) -> u256;
+    fn deposit_and_mint(ref self: TContractState, collateral_amount: u256) -> u256;
+    fn get_user_stats(self: @TContractState, user: ContractAddress) -> (u256, u256, u256);
+    fn get_contract_stats(self: @TContractState) -> (felt252, felt252, u256);
+}
+
 #[starknet::contract]
 mod DemoBTCUSD {
-    use core::num::traits::Zero;
     use starknet::{ContractAddress, get_caller_address};
 
     #[storage]
@@ -104,15 +116,4 @@ mod DemoBTCUSD {
             (self.name.read(), self.symbol.read(), self.total_supply.read())
         }
     }
-}
-
-#[starknet::interface]
-trait IDemoBTCUSD<TContractState> {
-    fn name(self: @TContractState) -> felt252;
-    fn symbol(self: @TContractState) -> felt252;
-    fn total_supply(self: @TContractState) -> u256;
-    fn balance_of(self: @TContractState, account: ContractAddress) -> u256;
-    fn deposit_and_mint(ref self: TContractState, collateral_amount: u256) -> u256;
-    fn get_user_stats(self: @TContractState, user: ContractAddress) -> (u256, u256, u256);
-    fn get_contract_stats(self: @TContractState) -> (felt252, felt252, u256);
 }
