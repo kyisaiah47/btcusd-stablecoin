@@ -244,75 +244,145 @@ export default function App() {
               </Text>
             </View>
 
-            {/* User Position Card */}
-            <View style={[styles.card, styles.firstCard]}>
-              <Text style={styles.cardTitle}>Your Position</Text>
-              <View style={styles.positionRow}>
-                <Text style={styles.positionLabel}>Collateral (wBTC)</Text>
-                <Text style={styles.positionValue}>{userPosition?.collateral || '0'} wBTC</Text>
+            {/* Stats Grid */}
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <Text style={styles.statLabel}>Collateral</Text>
+                <Text style={styles.statValue}>{userPosition?.collateral || '0'}</Text>
+                <Text style={styles.statUnit}>wBTC</Text>
               </View>
-              <View style={styles.positionRow}>
-                <Text style={styles.positionLabel}>Debt (BTCUSD)</Text>
-                <Text style={styles.positionValue}>${userPosition?.debt || '0'}</Text>
-              </View>
-              <View style={styles.positionRow}>
-                <Text style={styles.positionLabel}>Collateral Ratio</Text>
-                <Text style={[
-                  styles.positionValue,
-                  { color: parseInt(userPosition?.collateralRatio || '0') > 150 ? '#4CAF50' : '#FF5722' }
-                ]}>
-                  {userPosition?.collateralRatio || '0'}%
-                </Text>
+              <View style={styles.statCard}>
+                <Text style={styles.statLabel}>Debt</Text>
+                <Text style={styles.statValue}>${userPosition?.debt || '0'}</Text>
+                <Text style={styles.statUnit}>BTCUSD</Text>
               </View>
             </View>
 
-            {/* Deposit Card */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Deposit & Mint BTCUSD</Text>
-              <Text style={styles.inputLabel}>Collateral Amount</Text>
-              <TextInput
-                style={styles.input}
-                value={btcAmount}
-                onChangeText={setBtcAmount}
-                placeholder="0.01"
-                keyboardType="decimal-pad"
-                placeholderTextColor="#999"
-              />
+            {/* Health Ratio Card */}
+            <View style={[
+              styles.healthCard,
+              {
+                backgroundColor: parseInt(userPosition?.collateralRatio || '0') > 150
+                  ? '#10B98115'
+                  : '#EF444415'
+              }
+            ]}>
+              <View style={styles.healthHeader}>
+                <Text style={styles.healthLabel}>Health Ratio</Text>
+                <View style={[
+                  styles.healthBadge,
+                  {
+                    backgroundColor: parseInt(userPosition?.collateralRatio || '0') > 150
+                      ? '#10B981'
+                      : '#EF4444'
+                  }
+                ]}>
+                  <Text style={styles.healthBadgeText}>
+                    {parseInt(userPosition?.collateralRatio || '0') > 150 ? 'SAFE' : 'AT RISK'}
+                  </Text>
+                </View>
+              </View>
+              <Text style={[
+                styles.healthValue,
+                {
+                  color: parseInt(userPosition?.collateralRatio || '0') > 150
+                    ? '#10B981'
+                    : '#EF4444'
+                }
+              ]}>
+                {userPosition?.collateralRatio || '0'}%
+              </Text>
+              <View style={styles.healthBar}>
+                <View style={[
+                  styles.healthBarFill,
+                  {
+                    width: `${Math.min(parseInt(userPosition?.collateralRatio || '0'), 300)}%`,
+                    backgroundColor: parseInt(userPosition?.collateralRatio || '0') > 150
+                      ? '#10B981'
+                      : '#EF4444'
+                  }
+                ]} />
+              </View>
+              <Text style={styles.healthSubtext}>
+                Liquidation at 120% • Safe above 150%
+              </Text>
+            </View>
 
-              {btcAmount && (
-                <View style={styles.previewContainer}>
-                  <Text style={styles.previewText}>
-                    You'll receive: ~${(parseFloat(btcAmount || 0) * 65000 * 0.6667).toFixed(2)} BTCUSD
-                  </Text>
-                  <Text style={styles.previewSubtext}>
-                    At 66.67% LTV (150% collateral ratio)
-                  </Text>
+            {/* Deposit Card */}
+            <View style={styles.actionCard}>
+              <Text style={styles.cardTitle}>Deposit & Mint</Text>
+
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Amount</Text>
+                <View style={styles.inputWrapper}>
+                  <TextInput
+                    style={styles.amountInput}
+                    value={btcAmount}
+                    onChangeText={setBtcAmount}
+                    placeholder="0.00"
+                    keyboardType="decimal-pad"
+                    placeholderTextColor="#6B7280"
+                  />
+                  <View style={styles.inputBadge}>
+                    <Text style={styles.inputBadgeText}>wBTC</Text>
+                  </View>
+                </View>
+              </View>
+
+              {btcAmount && parseFloat(btcAmount) > 0 && (
+                <View style={styles.mintPreview}>
+                  <View style={styles.mintPreviewRow}>
+                    <Text style={styles.mintPreviewLabel}>You'll Receive</Text>
+                    <Text style={styles.mintPreviewValue}>
+                      ${(parseFloat(btcAmount || 0) * 65000 * 0.6667).toFixed(2)}
+                    </Text>
+                  </View>
+                  <View style={styles.mintPreviewRow}>
+                    <Text style={styles.mintPreviewLabel}>Collateral Ratio</Text>
+                    <Text style={styles.mintPreviewValue}>150%</Text>
+                  </View>
+                  <View style={styles.mintPreviewRow}>
+                    <Text style={styles.mintPreviewLabel}>LTV</Text>
+                    <Text style={styles.mintPreviewValue}>66.67%</Text>
+                  </View>
                 </View>
               )}
 
               <TouchableOpacity
-                style={[styles.actionButton, (loading || !btcAmount) && styles.actionButtonDisabled]}
+                style={[styles.primaryButton, (loading || !btcAmount) && styles.buttonDisabled]}
                 onPress={depositAndMint}
                 disabled={loading || !btcAmount}
               >
                 {loading ? (
-                  <ActivityIndicator color="#000" />
+                  <ActivityIndicator color="#FFF" />
                 ) : (
-                  <Text style={styles.actionButtonText}>Deposit & Mint (Real TX)</Text>
+                  <>
+                    <Text style={styles.primaryButtonText}>Execute Transaction</Text>
+                    <Text style={styles.primaryButtonSubtext}>On Starknet Testnet</Text>
+                  </>
                 )}
               </TouchableOpacity>
             </View>
 
             {/* Contract Info */}
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Contract Info</Text>
-              <Text style={styles.infoText}>Address: {CONTRACT_ADDRESS.slice(0, 10)}...</Text>
-              <Text style={styles.infoText}>Network: Starknet Sepolia</Text>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoCardTitle}>Contract Details</Text>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoRowLabel}>Address</Text>
+                <Text style={styles.infoRowValue}>{CONTRACT_ADDRESS.slice(0, 8)}...{CONTRACT_ADDRESS.slice(-6)}</Text>
+              </View>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoRowLabel}>Network</Text>
+                <View style={styles.networkBadge}>
+                  <View style={styles.networkDot} />
+                  <Text style={styles.infoRowValue}>Sepolia Testnet</Text>
+                </View>
+              </View>
               <TouchableOpacity
-                style={[styles.secondaryButton, {marginTop: 12}]}
+                style={styles.outlineButton}
                 onPress={checkContractInfo}
               >
-                <Text style={styles.secondaryButtonText}>Refresh Contract Data</Text>
+                <Text style={styles.outlineButtonText}>View Contract Data</Text>
               </TouchableOpacity>
             </View>
           </>
@@ -459,6 +529,101 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#2A2A40',
   },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#1A1A2E',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#2A2A40',
+  },
+  statLabel: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontWeight: '500',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  statValue: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 4,
+  },
+  statUnit: {
+    fontSize: 14,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  healthCard: {
+    marginHorizontal: 24,
+    marginBottom: 16,
+    padding: 24,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#2A2A40',
+  },
+  healthHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  healthLabel: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  healthBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  healthBadgeText: {
+    fontSize: 11,
+    color: '#FFFFFF',
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  healthValue: {
+    fontSize: 48,
+    fontWeight: '800',
+    marginBottom: 16,
+    letterSpacing: -1,
+  },
+  healthBar: {
+    height: 8,
+    backgroundColor: '#2A2A40',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  healthBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  healthSubtext: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  actionCard: {
+    backgroundColor: '#1A1A2E',
+    borderRadius: 20,
+    padding: 24,
+    marginHorizontal: 24,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#2A2A40',
+  },
   cardTitle: {
     fontSize: 20,
     fontWeight: '700',
@@ -466,82 +631,148 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     letterSpacing: -0.3,
   },
-  positionRow: {
+  inputContainer: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    marginBottom: 8,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0F0F1A',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#2A2A40',
+    paddingRight: 12,
+  },
+  amountInput: {
+    flex: 1,
+    padding: 20,
+    fontSize: 32,
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  inputBadge: {
+    backgroundColor: '#6366F1',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  inputBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  mintPreview: {
+    backgroundColor: '#0F0F1A',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#2A2A40',
+  },
+  mintPreviewRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
   },
-  positionLabel: {
-    fontSize: 15,
-    color: '#A0A0A0',
-    fontWeight: '500',
-  },
-  positionValue: {
-    fontSize: 15,
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  inputLabel: {
-    fontSize: 15,
-    color: '#FFFFFF',
-    marginBottom: 8,
-    fontWeight: '600',
-  },
-  input: {
-    backgroundColor: '#0F0F1A',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#2A2A40',
-    marginBottom: 16,
-    fontWeight: '500',
-  },
-  previewContainer: {
-    backgroundColor: '#1E1B4B',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#6366F1',
-  },
-  previewText: {
-    fontSize: 16,
-    color: '#A5B4FC',
-    fontWeight: '600',
-  },
-  previewSubtext: {
+  mintPreviewLabel: {
     fontSize: 14,
     color: '#9CA3AF',
-    marginTop: 4,
     fontWeight: '500',
   },
-  actionButton: {
+  mintPreviewValue: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  primaryButton: {
     backgroundColor: '#6366F1',
-    paddingVertical: 16,
-    borderRadius: 12,
+    paddingVertical: 20,
+    borderRadius: 16,
     alignItems: 'center',
   },
-  actionButtonText: {
+  primaryButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
   },
-  infoText: {
+  primaryButtonSubtext: {
+    color: '#C7D2FE',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  buttonDisabled: {
+    opacity: 0.5,
+  },
+  infoCard: {
+    backgroundColor: '#1A1A2E',
+    borderRadius: 16,
+    padding: 24,
+    marginHorizontal: 24,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#2A2A40',
+  },
+  infoCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 20,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  infoRowLabel: {
     fontSize: 14,
-    color: '#A0A0A0',
-    marginBottom: 8,
+    color: '#9CA3AF',
+    fontWeight: '500',
+  },
+  infoRowValue: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
     fontFamily: 'monospace',
+  },
+  networkBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  networkDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+  },
+  outlineButton: {
+    borderWidth: 1,
+    borderColor: '#2A2A40',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  outlineButtonText: {
+    color: '#A5B4FC',
+    fontSize: 15,
+    fontWeight: '600',
   },
   firstCard: {
     marginTop: 16,
   },
   connectButtonLoading: {
     opacity: 0.7,
-  },
-  actionButtonDisabled: {
-    opacity: 0.6,
   },
 });
