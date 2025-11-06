@@ -158,17 +158,21 @@ export default function App() {
       const symbol = await contract.symbol();
       const totalSupply = await contract.total_supply();
 
-      // Convert felt252 to string
-      const nameStr = shortString.decodeShortString(name.toString(16));
-      const symbolStr = shortString.decodeShortString(symbol.toString(16));
+      // Convert felt252 to string - handle BigInt properly
+      const nameHex = typeof name === 'bigint' ? name.toString(16) : name.toString(16);
+      const symbolHex = typeof symbol === 'bigint' ? symbol.toString(16) : symbol.toString(16);
+
+      const nameStr = shortString.decodeShortString('0x' + nameHex.replace(/^0x/, ''));
+      const symbolStr = shortString.decodeShortString('0x' + symbolHex.replace(/^0x/, ''));
 
       Alert.alert(
         'Contract Info',
-        `Name: ${nameStr}\nSymbol: ${symbolStr}\nTotal Supply: ${Number(totalSupply) / 1e18}`
+        `Name: ${nameStr}\nSymbol: ${symbolStr}\nTotal Supply: ${Number(totalSupply[0]) / 1e18}`
       );
       setLoading(false);
     } catch (error) {
       console.error('Failed to get contract info:', error);
+      Alert.alert('Error', `Failed to load contract info: ${error.message}`);
       setLoading(false);
     }
   };
