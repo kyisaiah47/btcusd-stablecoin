@@ -233,21 +233,20 @@ export default function App() {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.testButton, {marginTop: 12}]}
+              style={[styles.secondaryButton, {marginTop: 12}]}
               onPress={() => {
-                // Testnet account private key (TESTNET ONLY!)
                 setPrivateKey('0x73afc4afd35d0e903ed04fe110b3b33590d7daf30c810f64797c8ea8caabd3d6');
                 setShowKeyInput(true);
               }}
             >
-              <Text style={styles.testButtonText}>🧪 Use Test Account</Text>
+              <Text style={styles.secondaryButtonText}>Use Test Account</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.secondaryButton, {marginTop: 12}]}
               onPress={checkContractInfo}
             >
-              <Text style={styles.secondaryButtonText}>View Contract Info (No Login)</Text>
+              <Text style={styles.secondaryButtonText}>View Contract Info</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -414,7 +413,7 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#1A1A2E',
-    paddingTop: 50,
+    paddingTop: 70,
     paddingBottom: 24,
     borderBottomWidth: 1,
     borderBottomColor: '#2A2A40',
