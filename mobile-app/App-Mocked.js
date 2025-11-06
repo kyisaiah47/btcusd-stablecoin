@@ -12,102 +12,59 @@ import {
   ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Contract, RpcProvider, Account, CallData, shortString } from 'starknet';
-import contractAbi from './contract-abi.json';
+import { Contract, RpcProvider, Account } from 'starknet';
 
 const { width, height } = Dimensions.get('window');
 
-// Deployed testnet contract
-const CONTRACT_ADDRESS = '0x069818be022a2633500ba32c398280c2f49f19b881f9c3952d3d164df93bfd4e';
+// Deployed testnet contract addresses
+const CONTRACTS = {
+  VAULT: '0x069818be022a2633500ba32c398280c2f49f19b881f9c3952d3d164df93bfd4e', // BTCUSD Demo Contract
+  TOKEN: '0x069818be022a2633500ba32c398280c2f49f19b881f9c3952d3d164df93bfd4e', // Same contract (has token functions)
+  WBTC: '0x789...' // To be replaced when integrated
+};
 
 export default function App() {
   const [walletConnected, setWalletConnected] = useState(false);
   const [account, setAccount] = useState(null);
-  const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(false);
   const [btcAmount, setBtcAmount] = useState('');
   const [btcusdAmount, setBtcusdAmount] = useState('');
   const [userPosition, setUserPosition] = useState(null);
-  const [privateKey, setPrivateKey] = useState('');
-  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [yieldEarned, setYieldEarned] = useState('0');
 
   // Initialize Starknet provider (Sepolia testnet)
   const provider = new RpcProvider({
     nodeUrl: 'https://starknet-sepolia-rpc.publicnode.com'
   });
 
-  // Initialize read-only contract
-  useEffect(() => {
-    const readOnlyContract = new Contract(contractAbi, CONTRACT_ADDRESS, provider);
-    setContract(readOnlyContract);
-  }, []);
-
   const connectWallet = async () => {
     try {
       setLoading(true);
-
-      if (!privateKey) {
-        setShowKeyInput(true);
+      // Mock wallet connection - in production, integrate with Braavos
+      setTimeout(() => {
+        setWalletConnected(true);
+        setAccount({
+          address: '0x0123456789abcdef...',
+          balance: '0.5'
+        });
         setLoading(false);
-        return;
-      }
-
-      // Create account from private key
-      // Replace with your deployed account address
-      const accountAddress = '0x01f7bb20a9a9f073da23ab3319ec81e81289982b9afd1115269003a6c5f20acf';
-
-      const userAccount = new Account(provider, accountAddress, privateKey);
-      setAccount(userAccount);
-
-      // Connect contract to account for transactions
-      const connectedContract = new Contract(contractAbi, CONTRACT_ADDRESS, userAccount);
-      setContract(connectedContract);
-
-      setWalletConnected(true);
-      setShowKeyInput(false);
-      setLoading(false);
-
-      await loadUserData(accountAddress, connectedContract);
+        loadUserData();
+      }, 2000);
     } catch (error) {
       console.error('Wallet connection failed:', error);
-      Alert.alert('Error', 'Failed to connect wallet. Check your private key.');
       setLoading(false);
     }
   };
 
-  const loadUserData = async (address, contractInstance) => {
-    try {
-      const contract = contractInstance || contract;
-
-      // Get user stats from contract
-      const stats = await contract.get_user_stats(address);
-
-      // stats returns (collateral, debt, balance)
-      const collateral = stats[0];
-      const debt = stats[1];
-      const balance = stats[2];
-
-      setUserPosition({
-        collateral: (Number(collateral) / 1e8).toFixed(4), // Assuming 8 decimals
-        debt: (Number(debt) / 1e18).toFixed(2),
-        collateralRatio: debt > 0 ? ((Number(collateral) * 100) / Number(debt)).toFixed(0) : '0',
-        liquidationPrice: '0' // Calculate based on your logic
-      });
-
-      // Get balance
-      const userBalance = await contract.balance_of(address);
-      setBtcusdAmount((Number(userBalance) / 1e18).toFixed(2));
-
-    } catch (error) {
-      console.error('Failed to load user data:', error);
-      // Set defaults if no position yet
-      setUserPosition({
-        collateral: '0',
-        debt: '0',
-        collateralRatio: '0',
-        liquidationPrice: '0'
-      });
-    }
+  const loadUserData = async () => {
+    // Mock user position data
+    setUserPosition({
+      collateral: '0.15',
+      debt: '6500',
+      collateralRatio: '165',
+      liquidationPrice: '45000'
+    });
+    setYieldEarned('127.50');
   };
 
   const depositAndMint = async () => {
@@ -116,59 +73,36 @@ export default function App() {
       return;
     }
 
-    if (!account) {
-      Alert.alert('Error', 'Please connect your wallet first');
-      return;
-    }
-
     setLoading(true);
     try {
-      // Convert amount to proper format (assuming 8 decimals for BTC)
-      const amountInSmallestUnit = Math.floor(parseFloat(btcAmount) * 1e8);
-
-      // Call deposit_and_mint
-      const result = await contract.deposit_and_mint(amountInSmallestUnit);
-
-      // Wait for transaction
-      await provider.waitForTransaction(result.transaction_hash);
-
-      const mintAmount = (parseFloat(btcAmount) * 65000 * 0.6667).toFixed(2);
-      setBtcusdAmount(mintAmount);
-
-      Alert.alert(
-        'Success!',
-        `Transaction confirmed!\nDeposited ${btcAmount} BTC\nMinted ~${mintAmount} BTCUSD\n\nTx: ${result.transaction_hash.slice(0, 10)}...`
-      );
-
-      setLoading(false);
-      await loadUserData(account.address, contract);
+      // Mock transaction - replace with actual Starknet contract call
+      setTimeout(() => {
+        const mintAmount = (parseFloat(btcAmount) * 65000 * 0.6667).toFixed(2);
+        setBtcusdAmount(mintAmount);
+        Alert.alert(
+          'Success!',
+          `Deposited ${btcAmount} BTC\nMinted ${mintAmount} BTCUSD\nNow earning yield on Vesu!`
+        );
+        setLoading(false);
+        loadUserData();
+      }, 3000);
     } catch (error) {
       console.error('Transaction failed:', error);
-      Alert.alert('Error', `Transaction failed: ${error.message}`);
+      Alert.alert('Error', 'Transaction failed. Please try again.');
       setLoading(false);
     }
   };
 
-  const checkContractInfo = async () => {
-    if (!contract) return;
-
+  const harvestYield = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const name = await contract.name();
-      const symbol = await contract.symbol();
-      const totalSupply = await contract.total_supply();
-
-      // Convert felt252 to string
-      const nameStr = shortString.decodeShortString(name.toString(16));
-      const symbolStr = shortString.decodeShortString(symbol.toString(16));
-
-      Alert.alert(
-        'Contract Info',
-        `Name: ${nameStr}\nSymbol: ${symbolStr}\nTotal Supply: ${Number(totalSupply) / 1e18}`
-      );
-      setLoading(false);
+      setTimeout(() => {
+        Alert.alert('Yield Harvested!', `Claimed $${yieldEarned} in yield rewards`);
+        setYieldEarned('0');
+        setLoading(false);
+      }, 2000);
     } catch (error) {
-      console.error('Failed to get contract info:', error);
+      console.error('Harvest failed:', error);
       setLoading(false);
     }
   };
@@ -185,7 +119,7 @@ export default function App() {
             </View>
             <Text style={styles.headerTitle}>BTCUSD</Text>
           </View>
-          <Text style={styles.headerSubtitle}>Live on Starknet Testnet</Text>
+          <Text style={styles.headerSubtitle}>Bitcoin-Backed Stablecoin</Text>
         </View>
       </View>
 
@@ -195,25 +129,8 @@ export default function App() {
           <View style={styles.connectSection}>
             <Text style={styles.sectionTitle}>Connect Your Wallet</Text>
             <Text style={styles.sectionSubtitle}>
-              Enter your Starknet private key to connect
+              Use Braavos wallet for seamless Bitcoin integration
             </Text>
-
-            {showKeyInput && (
-              <>
-                <TextInput
-                  style={styles.keyInput}
-                  value={privateKey}
-                  onChangeText={setPrivateKey}
-                  placeholder="0x... (your private key)"
-                  placeholderTextColor="#666"
-                  secureTextEntry
-                />
-                <Text style={styles.warningText}>
-                  ⚠️ Only use testnet keys! Never enter mainnet private keys.
-                </Text>
-              </>
-            )}
-
             <TouchableOpacity
               style={[styles.connectButton, loading && styles.connectButtonLoading]}
               onPress={connectWallet}
@@ -222,28 +139,12 @@ export default function App() {
               {loading ? (
                 <ActivityIndicator color="#000" />
               ) : (
-                <Text style={styles.connectButtonText}>
-                  {showKeyInput ? 'Connect' : 'Connect Wallet'}
-                </Text>
+                <Text style={styles.connectButtonText}>Connect Braavos Wallet</Text>
               )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.secondaryButton, {marginTop: 12}]}
-              onPress={checkContractInfo}
-            >
-              <Text style={styles.secondaryButtonText}>View Contract Info</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            {/* Connected Badge */}
-            <View style={styles.connectedBadge}>
-              <Text style={styles.connectedText}>
-                Connected: {account?.address.slice(0, 6)}...{account?.address.slice(-4)}
-              </Text>
-            </View>
-
             {/* User Position Card */}
             <View style={[styles.card, styles.firstCard]}>
               <Text style={styles.cardTitle}>Your Position</Text>
@@ -264,12 +165,32 @@ export default function App() {
                   {userPosition?.collateralRatio || '0'}%
                 </Text>
               </View>
+              <View style={styles.positionRow}>
+                <Text style={styles.positionLabel}>Liquidation Price</Text>
+                <Text style={styles.positionValue}>${userPosition?.liquidationPrice || '0'}</Text>
+              </View>
+            </View>
+
+            {/* Yield Card */}
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Yield Earnings</Text>
+              <View style={styles.yieldContainer}>
+                <Text style={styles.yieldAmount}>${yieldEarned}</Text>
+                <Text style={styles.yieldLabel}>Available to Claim</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
+                onPress={harvestYield}
+                disabled={loading || parseFloat(yieldEarned) === 0}
+              >
+                <Text style={styles.actionButtonText}>Harvest Yield</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Deposit Card */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Deposit & Mint BTCUSD</Text>
-              <Text style={styles.inputLabel}>Collateral Amount</Text>
+              <Text style={styles.cardTitle}>Deposit BTC & Mint BTCUSD</Text>
+              <Text style={styles.inputLabel}>BTC Amount</Text>
               <TextInput
                 style={styles.input}
                 value={btcAmount}
@@ -298,22 +219,42 @@ export default function App() {
                 {loading ? (
                   <ActivityIndicator color="#000" />
                 ) : (
-                  <Text style={styles.actionButtonText}>Deposit & Mint (Real TX)</Text>
+                  <Text style={styles.actionButtonText}>Deposit & Mint</Text>
                 )}
               </TouchableOpacity>
             </View>
 
-            {/* Contract Info */}
+            {/* Features Card */}
             <View style={styles.card}>
-              <Text style={styles.cardTitle}>Contract Info</Text>
-              <Text style={styles.infoText}>Address: {CONTRACT_ADDRESS.slice(0, 10)}...</Text>
-              <Text style={styles.infoText}>Network: Starknet Sepolia</Text>
-              <TouchableOpacity
-                style={[styles.secondaryButton, {marginTop: 12}]}
-                onPress={checkContractInfo}
-              >
-                <Text style={styles.secondaryButtonText}>Refresh Contract Data</Text>
-              </TouchableOpacity>
+              <Text style={styles.cardTitle}>Why BTCUSD?</Text>
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>⚡</Text>
+                <View style={styles.featureContent}>
+                  <Text style={styles.featureTitle}>Lightning Fast</Text>
+                  <Text style={styles.featureDescription}>Instant transactions on Starknet</Text>
+                </View>
+              </View>
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>🔒</Text>
+                <View style={styles.featureContent}>
+                  <Text style={styles.featureTitle}>Bitcoin Secured</Text>
+                  <Text style={styles.featureDescription}>Backed by real Bitcoin via Atomiq bridge</Text>
+                </View>
+              </View>
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>💰</Text>
+                <View style={styles.featureContent}>
+                  <Text style={styles.featureTitle}>Earn Yield</Text>
+                  <Text style={styles.featureDescription}>Auto-farming on Vesu protocol</Text>
+                </View>
+              </View>
+              <View style={styles.featureItem}>
+                <Text style={styles.featureIcon}>📱</Text>
+                <View style={styles.featureContent}>
+                  <Text style={styles.featureTitle}>Mobile Native</Text>
+                  <Text style={styles.featureDescription}>Optimized for mobile DeFi</Text>
+                </View>
+              </View>
             </View>
           </>
         )}
@@ -364,7 +305,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 15,
-    color: '#00D4AA',
+    color: '#A0A0A0',
     fontWeight: '500',
   },
   content: {
@@ -391,24 +332,6 @@ const styles = StyleSheet.create({
     lineHeight: 24,
     fontWeight: '500',
   },
-  keyInput: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 14,
-    color: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    marginBottom: 12,
-    width: '100%',
-    fontFamily: 'monospace',
-  },
-  warningText: {
-    fontSize: 12,
-    color: '#FF9800',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
   connectButton: {
     backgroundColor: '#FFFFFF',
     paddingVertical: 16,
@@ -421,34 +344,6 @@ const styles = StyleSheet.create({
     color: '#000000',
     fontSize: 16,
     fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: '#1A1A1A',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-  },
-  secondaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  connectedBadge: {
-    backgroundColor: '#00D4AA20',
-    padding: 12,
-    marginHorizontal: 24,
-    marginTop: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#00D4AA',
-  },
-  connectedText: {
-    color: '#00D4AA',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
   },
   card: {
     backgroundColor: '#111111',
@@ -481,6 +376,27 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  yieldContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+    padding: 20,
+    backgroundColor: '#0A0A0A',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1A1A1A',
+  },
+  yieldAmount: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#00D4AA',
+    letterSpacing: -1,
+  },
+  yieldLabel: {
+    fontSize: 14,
+    color: '#A0A0A0',
+    marginTop: 4,
+    fontWeight: '500',
   },
   inputLabel: {
     fontSize: 15,
@@ -529,14 +445,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  infoText: {
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+    padding: 16,
+    backgroundColor: '#0A0A0A',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1A1A1A',
+  },
+  featureIcon: {
+    fontSize: 20,
+    marginRight: 16,
+    marginTop: 2,
+  },
+  featureContent: {
+    flex: 1,
+  },
+  featureTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    marginBottom: 4,
+    letterSpacing: -0.2,
+  },
+  featureDescription: {
     fontSize: 14,
     color: '#A0A0A0',
-    marginBottom: 8,
-    fontFamily: 'monospace',
+    lineHeight: 20,
+    fontWeight: '500',
   },
   firstCard: {
-    marginTop: 16,
+    marginTop: 24,
   },
   connectButtonLoading: {
     opacity: 0.7,
