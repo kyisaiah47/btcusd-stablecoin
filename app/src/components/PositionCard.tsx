@@ -4,94 +4,99 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import type { FormattedPosition } from '@/types';
+import { COLORS, PROTOCOL } from '../constants';
+import type { Position } from '../types';
 
-interface PositionCardProps {
-  position: FormattedPosition | null;
-  health: {
-    isHealthy: boolean;
-    isLiquidatable: boolean;
-    warningLevel: 'none' | 'warning' | 'danger';
-    ratio?: number;
-  };
+interface Props {
+  position: Position | null;
+  btcPrice: bigint | null;
 }
 
-export function PositionCard({ position, health }: PositionCardProps) {
-  if (!position) {
+export function PositionCard({ position, btcPrice }: Props) {
+  const formatBTC = (value: bigint) => {
+    return (Number(value) / 1e8).toFixed(6);
+  };
+
+  const formatUSD = (value: bigint) => {
+    return (Number(value) / 1e18).toFixed(2);
+  };
+
+  const getHealthColor = (healthFactor: number) => {
+    if (healthFactor >= 2) return COLORS.success;
+    if (healthFactor >= 1.5) return COLORS.warning;
+    return COLORS.danger;
+  };
+
+  if (!position || position.collateral === 0n) {
     return (
       <View style={styles.card}>
         <Text style={styles.title}>Your Position</Text>
-        <Text style={styles.emptyText}>No active position</Text>
-        <Text style={styles.hintText}>Deposit wBTC to get started</Text>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>₿</Text>
+          <Text style={styles.emptyText}>No active position</Text>
+          <Text style={styles.emptySubtext}>
+            Deposit wBTC collateral to mint BTCUSD stablecoin
+          </Text>
+        </View>
       </View>
     );
   }
 
-  const ratioColor =
-    health.warningLevel === 'danger'
-      ? '#FF5722'
-      : health.warningLevel === 'warning'
-      ? '#FFC107'
-      : '#4CAF50';
+  const collateralUSD = btcPrice
+    ? (Number(position.collateral) * Number(btcPrice)) / (1e8 * 1e8)
+    : 0;
 
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Your Position</Text>
-        {health.warningLevel !== 'none' && (
-          <View style={[styles.badge, { backgroundColor: ratioColor }]}>
-            <Text style={styles.badgeText}>
-              {health.isLiquidatable ? 'LIQUIDATABLE' : 'AT RISK'}
-            </Text>
-          </View>
-        )}
-      </View>
+      <Text style={styles.title}>Your Position</Text>
 
       <View style={styles.row}>
-        <Text style={styles.label}>Collateral</Text>
-        <View style={styles.valueContainer}>
-          <Text style={styles.value}>{position.collateral} wBTC</Text>
-          <Text style={styles.subValue}>{position.collateralUSD}</Text>
+        <View style={styles.stat}>
+          <Text style={styles.label}>Collateral</Text>
+          <Text style={styles.value}>{formatBTC(position.collateral)} wBTC</Text>
+          <Text style={styles.subvalue}>${collateralUSD.toFixed(2)}</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={styles.label}>Debt</Text>
+          <Text style={styles.value}>{formatUSD(position.debt)} BTCUSD</Text>
         </View>
       </View>
 
-      <View style={styles.row}>
-        <Text style={styles.label}>Debt</Text>
-        <View style={styles.valueContainer}>
-          <Text style={styles.value}>${position.debt}</Text>
-          <Text style={styles.subValue}>BTCUSD</Text>
+      <View style={styles.healthSection}>
+        <View style={styles.healthHeader}>
+          <Text style={styles.label}>Health Factor</Text>
+          <Text style={[styles.healthValue, { color: getHealthColor(position.healthFactor) }]}>
+            {position.healthFactor.toFixed(2)}
+          </Text>
         </View>
-      </View>
-
-      <View style={styles.divider} />
-
-      <View style={styles.row}>
-        <Text style={styles.label}>Collateral Ratio</Text>
-        <Text style={[styles.value, { color: ratioColor }]}>{position.collateralRatio}</Text>
-      </View>
-
-      <View style={styles.row}>
-        <Text style={styles.label}>Liquidation Price</Text>
-        <Text style={styles.value}>{position.liquidationPrice}</Text>
-      </View>
-
-      {/* Health Bar */}
-      <View style={styles.healthBar}>
-        <View style={styles.healthTrack}>
+        <View style={styles.healthBar}>
           <View
             style={[
               styles.healthFill,
               {
-                width: `${Math.min(100, health.ratio ? (health.ratio / 200) * 100 : 0)}%`,
-                backgroundColor: ratioColor,
-              },
+                width: `${Math.min(position.healthFactor / 3 * 100, 100)}%`,
+                backgroundColor: getHealthColor(position.healthFactor)
+              }
             ]}
           />
         </View>
-        <View style={styles.healthLabels}>
-          <Text style={styles.healthLabel}>120% Liq</Text>
-          <Text style={styles.healthLabel}>150% Min</Text>
-          <Text style={styles.healthLabel}>200%</Text>
+        <Text style={styles.healthNote}>
+          {position.healthFactor >= 1.5
+            ? 'Your position is healthy'
+            : position.healthFactor >= 1.2
+            ? '⚠️ Consider adding collateral'
+            : '🚨 Liquidation risk!'}
+        </Text>
+      </View>
+
+      <View style={styles.row}>
+        <View style={styles.stat}>
+          <Text style={styles.label}>Collateral Ratio</Text>
+          <Text style={styles.value}>{(position.collateralRatio / 100).toFixed(1)}%</Text>
+        </View>
+        <View style={styles.stat}>
+          <Text style={styles.label}>Max Borrowable</Text>
+          <Text style={styles.value}>{formatUSD(position.maxBorrowable)} BTCUSD</Text>
         </View>
       </View>
     </View>
@@ -100,94 +105,90 @@ export function PositionCard({ position, health }: PositionCardProps) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#111',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 20,
-    borderWidth: 1,
-    borderColor: '#222',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   title: {
+    color: COLORS.text,
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    marginBottom: 16,
   },
-  badge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 24,
   },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#fff',
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  emptyText: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+  },
+  stat: {
+    flex: 1,
   },
   label: {
-    fontSize: 14,
-    color: '#888',
-  },
-  valueContainer: {
-    alignItems: 'flex-end',
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    marginBottom: 4,
   },
   value: {
-    fontSize: 16,
+    color: COLORS.text,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
   },
-  subValue: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 2,
+  subvalue: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#222',
-    marginVertical: 12,
+  healthSection: {
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  healthHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  healthValue: {
+    fontSize: 24,
+    fontWeight: '700',
   },
   healthBar: {
-    marginTop: 16,
-  },
-  healthTrack: {
     height: 8,
-    backgroundColor: '#222',
+    backgroundColor: COLORS.border,
     borderRadius: 4,
     overflow: 'hidden',
+    marginBottom: 8,
   },
   healthFill: {
     height: '100%',
     borderRadius: 4,
   },
-  healthLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6,
-  },
-  healthLabel: {
-    fontSize: 10,
-    color: '#666',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#888',
+  healthNote: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
     textAlign: 'center',
-    marginTop: 20,
-  },
-  hintText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 10,
   },
 });

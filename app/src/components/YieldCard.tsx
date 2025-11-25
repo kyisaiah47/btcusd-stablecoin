@@ -3,91 +3,87 @@
  */
 
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { useHarvestYield } from '@/hooks/useYield';
-import type { FormattedYieldInfo } from '@/types';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { COLORS } from '../constants';
+import type { YieldInfo } from '../types';
 
-interface YieldCardProps {
-  yieldInfo: FormattedYieldInfo | null;
+interface Props {
+  yieldInfo: YieldInfo | null;
+  onHarvest: () => void;
 }
 
-export function YieldCard({ yieldInfo }: YieldCardProps) {
-  const { harvest, loading } = useHarvestYield();
-
-  const handleHarvest = async () => {
-    await harvest();
+export function YieldCard({ yieldInfo, onHarvest }: Props) {
+  const formatBTC = (value: bigint) => {
+    return (Number(value) / 1e8).toFixed(8);
   };
 
-  if (!yieldInfo) {
+  if (!yieldInfo || yieldInfo.deposited === 0n) {
     return (
       <View style={styles.card}>
         <Text style={styles.title}>Yield Earnings</Text>
-        <Text style={styles.emptyText}>Deposit collateral to start earning</Text>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>📈</Text>
+          <Text style={styles.emptyText}>No yield deposits</Text>
+          <Text style={styles.emptySubtext}>
+            Deposit wBTC to start earning yield through Vesu
+          </Text>
+        </View>
       </View>
     );
   }
-
-  const hasYield = parseFloat(yieldInfo.userClaimable) > 0;
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>Yield Earnings</Text>
         <View style={styles.apyBadge}>
-          <Text style={styles.apyText}>{yieldInfo.apy} APY</Text>
+          <Text style={styles.apyText}>{yieldInfo.apy.toFixed(2)}% APY</Text>
         </View>
       </View>
 
-      {/* Main Yield Display */}
-      <View style={styles.yieldDisplay}>
-        <Text style={styles.yieldAmount}>{yieldInfo.earnedYieldUSD}</Text>
-        <Text style={styles.yieldSubtext}>
-          {yieldInfo.earnedYield} wBTC earned
-        </Text>
-      </View>
-
-      {/* Breakdown */}
-      <View style={styles.breakdown}>
-        <View style={styles.breakdownRow}>
-          <Text style={styles.breakdownLabel}>Your share (70%)</Text>
-          <Text style={styles.breakdownValue}>{yieldInfo.userClaimable} wBTC</Text>
+      <View style={styles.row}>
+        <View style={styles.stat}>
+          <Text style={styles.label}>Deposited</Text>
+          <Text style={styles.value}>{formatBTC(yieldInfo.deposited)} wBTC</Text>
         </View>
-        <View style={styles.breakdownRow}>
-          <Text style={styles.breakdownLabel}>Protocol fee (30%)</Text>
-          <Text style={styles.breakdownValue}>{yieldInfo.protocolFee} wBTC</Text>
-        </View>
-      </View>
-
-      {/* Harvest Button */}
-      <TouchableOpacity
-        style={[styles.harvestButton, !hasYield && styles.harvestButtonDisabled]}
-        onPress={handleHarvest}
-        disabled={loading || !hasYield}
-      >
-        {loading ? (
-          <ActivityIndicator color="#000" />
-        ) : (
-          <Text style={styles.harvestButtonText}>
-            {hasYield ? 'Harvest Yield' : 'No Yield to Harvest'}
+        <View style={styles.stat}>
+          <Text style={styles.label}>Total Earned</Text>
+          <Text style={[styles.value, styles.earned]}>
+            +{formatBTC(yieldInfo.earnedYield)} wBTC
           </Text>
-        )}
-      </TouchableOpacity>
+        </View>
+      </View>
 
-      {/* Info */}
-      <Text style={styles.infoText}>
-        Yield is generated from Vesu lending pools. 70% goes to you, 30% to the protocol.
-      </Text>
+      <View style={styles.pendingSection}>
+        <View style={styles.pendingInfo}>
+          <Text style={styles.label}>Pending Yield</Text>
+          <Text style={styles.pendingValue}>
+            {formatBTC(yieldInfo.pendingYield)} wBTC
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={[
+            styles.harvestButton,
+            yieldInfo.pendingYield === 0n && styles.harvestButtonDisabled
+          ]}
+          onPress={onHarvest}
+          disabled={yieldInfo.pendingYield === 0n}
+        >
+          <Text style={styles.harvestButtonText}>Harvest</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#111',
+    backgroundColor: COLORS.surface,
     borderRadius: 16,
     padding: 20,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#222',
+    borderColor: COLORS.border,
   },
   header: {
     flexDirection: 'row',
@@ -96,84 +92,89 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
+    color: COLORS.text,
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
   },
   apyBadge: {
-    backgroundColor: '#1A3A1A',
-    paddingHorizontal: 10,
+    backgroundColor: COLORS.success + '20',
+    paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2A5A2A',
+    borderRadius: 12,
   },
   apyText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#4CAF50',
+    color: COLORS.success,
+    fontSize: 14,
+    fontWeight: '600',
   },
-  yieldDisplay: {
+  emptyState: {
     alignItems: 'center',
     paddingVertical: 24,
-    backgroundColor: '#0A0A0A',
-    borderRadius: 12,
-    marginBottom: 16,
   },
-  yieldAmount: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#00D4AA',
-    letterSpacing: -1,
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 12,
   },
-  yieldSubtext: {
+  emptyText: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    color: COLORS.textSecondary,
     fontSize: 14,
-    color: '#888',
-    marginTop: 4,
+    textAlign: 'center',
   },
-  breakdown: {
-    gap: 8,
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 16,
   },
-  breakdownRow: {
+  stat: {
+    flex: 1,
+  },
+  label: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  value: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  earned: {
+    color: COLORS.success,
+  },
+  pendingSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 12,
+    padding: 16,
   },
-  breakdownLabel: {
-    fontSize: 14,
-    color: '#888',
+  pendingInfo: {
+    flex: 1,
   },
-  breakdownValue: {
-    fontSize: 14,
+  pendingValue: {
+    color: COLORS.primary,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
   },
   harvestButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
   },
   harvestButtonDisabled: {
-    backgroundColor: '#333',
+    backgroundColor: COLORS.border,
   },
   harvestButtonText: {
-    fontSize: 16,
+    color: COLORS.text,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#000',
-  },
-  infoText: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#888',
-    textAlign: 'center',
-    marginVertical: 30,
   },
 });

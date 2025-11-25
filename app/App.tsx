@@ -1,54 +1,30 @@
 /**
- * BTCUSD Protocol Mobile App
- *
- * A Bitcoin-backed stablecoin on Starknet
+ * BTCUSD - Bitcoin-Backed Stablecoin App
+ * Built for Starknet Re{Solve} Hackathon
  */
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-
-// Screens
-import { DashboardScreen } from '@/screens/Dashboard';
-
-// Initialize Starknet provider
-import { initProvider } from '@/services/starknet';
-initProvider('sepolia');
-
-const Stack = createNativeStackNavigator();
+import { Dashboard } from './src/screens/Dashboard';
+import { useStore } from './src/store';
 
 export default function App() {
+  const { setPrice } = useStore();
+
+  useEffect(() => {
+    // Set demo price on load
+    setPrice({
+      btcPrice: 9500000000000n, // $95,000
+      timestamp: Math.floor(Date.now() / 1000),
+      isStale: false,
+      source: 'demo',
+    });
+  }, []);
+
   return (
-    <SafeAreaProvider>
-      <NavigationContainer>
-        <StatusBar style="light" />
-        <Stack.Navigator
-          screenOptions={{
-            headerStyle: {
-              backgroundColor: '#111',
-            },
-            headerTintColor: '#fff',
-            headerTitleStyle: {
-              fontWeight: '700',
-            },
-            contentStyle: {
-              backgroundColor: '#0A0A0A',
-            },
-          }}
-        >
-          <Stack.Screen
-            name="Dashboard"
-            component={DashboardScreen}
-            options={{
-              title: 'BTCUSD',
-              headerLargeTitle: true,
-            }}
-          />
-          {/* Add other screens here */}
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <>
+      <StatusBar style="light" />
+      <Dashboard />
+    </>
   );
 }
