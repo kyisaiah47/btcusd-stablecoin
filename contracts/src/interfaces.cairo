@@ -16,3 +16,6 @@ pub use i_price_oracle::{
     IPriceOracle, IPriceOracleDispatcher, IPriceOracleDispatcherTrait, IMockOracle,
     IMockOracleDispatcher, IMockOracleDispatcherTrait,
 };
+
+// Re-export mock interfaces for testing
+pub use crate::mocks::mock_wbtc::{IMockWBTC, IMockWBTCDispatcher, IMockWBTCDispatcherTrait};

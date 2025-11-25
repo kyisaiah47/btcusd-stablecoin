@@ -128,70 +128,344 @@ btcusd-stablecoin/
 
 ## Development Roadmap
 
-### Stage 1: Core MVP (Testnet)
+### Stage 1: Core MVP (Testnet) ✅ COMPLETE
 **Goal:** Working vault with deposit/mint/burn/withdraw, mock yield tracking
 
 | Component | Description | Status |
 |-----------|-------------|--------|
-| BTCUSDToken | ERC20 stablecoin with vault-only minting | 🔨 Building |
-| BTCUSDVault | Core collateralization logic | 🔨 Building |
-| MockYieldManager | Virtual yield tracking (no real Vesu) | 🔨 Building |
-| MockOracle | Fixed BTC price for testing | 🔨 Building |
-| MockWBTC | Test ERC20 for wBTC | 🔨 Building |
+| BTCUSDToken | ERC20 stablecoin with vault-only minting | ✅ Done |
+| BTCUSDVault | Core collateralization logic | ✅ Done |
+| MockYieldManager | Virtual yield tracking (no real Vesu) | ✅ Done |
+| MockOracle | Configurable BTC price for testing | ✅ Done |
+| MockWBTC | Test ERC20 for wBTC | ✅ Done |
 
 **Deliverables:**
-- [ ] Contracts compile and pass tests
+- [x] Contracts compile with Cairo 2.9 / OZ v0.20.0
+- [x] Comprehensive test suite (5 test files, 80+ tests)
 - [ ] Deploy script for testnet
 - [ ] Basic mobile app connects to testnet
-- [ ] Can deposit → mint → burn → withdraw
+- [x] Can deposit → mint → burn → withdraw
 
 ### Stage 2: Liquidations
 **Goal:** Add liquidation mechanism with health factor monitoring
 
 | Component | Description |
 |-----------|-------------|
-| PragmaOracle adapter | Real price feeds |
-| Liquidator contract | Handles liquidations |
-| Health factor calculations | Proper collateral ratio checks |
-| Keeper bot | Monitors and triggers liquidations |
+| PragmaOracle adapter | Real price feeds from Pragma Network |
+| Liquidator contract | Handles partial and full liquidations |
+| Health factor calculations | Already in vault (needs integration) |
+| Keeper bot | Monitors positions, triggers liquidations |
+
+**New Contracts:**
+```cairo
+// contracts/src/oracles/pragma_oracle.cairo
+#[starknet::interface]
+pub trait IPragmaOracle<TContractState> {
+    fn get_btc_price(self: @TContractState) -> (u256, u64);
+    fn is_price_stale(self: @TContractState) -> bool;
+    fn get_max_price_age(self: @TContractState) -> u64;
+}
+
+// contracts/src/liquidation/liquidator.cairo
+#[starknet::interface]
+pub trait ILiquidator<TContractState> {
+    // Liquidate an unhealthy position
+    // Returns: (collateral_seized, debt_repaid)
+    fn liquidate(
+        ref self: TContractState,
+        user: ContractAddress,
+        btcusd_amount: u256
+    ) -> (u256, u256);
+
+    // Check if position can be liquidated
+    fn is_liquidatable(self: @TContractState, user: ContractAddress) -> bool;
+
+    // Calculate liquidation amounts
+    fn calculate_liquidation(
+        self: @TContractState,
+        user: ContractAddress,
+        btcusd_amount: u256
+    ) -> (u256, u256, u256); // (collateral, debt, bonus)
+
+    // Get liquidation parameters
+    fn get_liquidation_penalty(self: @TContractState) -> u256;  // e.g., 1000 = 10%
+    fn get_liquidator_reward(self: @TContractState) -> u256;    // e.g., 500 = 5%
+}
+```
+
+**Vault Updates for Stage 2:**
+- Add `liquidate()` function callable by Liquidator contract only
+- Add `set_liquidator()` admin function
+- Emit `PositionLiquidated` event
+
+**Backend: Liquidation Keeper**
+```typescript
+// backend/src/keepers/liquidation-bot.ts
+interface LiquidationBot {
+    // Monitor all positions every N blocks
+    pollInterval: number;  // e.g., 30 seconds
+
+    // Positions with health < threshold get added to queue
+    healthThreshold: number;  // 12000 = 120%
+
+    // Execute liquidations profitably
+    minProfitUSD: number;  // Minimum profit to execute
+
+    // Functions
+    scanPositions(): Promise<Position[]>;
+    findLiquidatablePositions(): Promise<Position[]>;
+    calculateProfit(position: Position): Promise<number>;
+    executeLiquidation(position: Position): Promise<TxHash>;
+}
+```
+
+---
 
 ### Stage 3: Real Yield (Vesu Integration)
 **Goal:** Collateral earns yield in Vesu lending pools
 
 | Component | Description |
 |-----------|-------------|
-| VesuAdapter | Deposit/withdraw to Vesu pools |
-| YieldManager (real) | Track actual yield, handle distribution |
-| Auto-compound hooks | Reinvest yield automatically |
+| VesuYieldManager | Replaces MockYieldManager with real Vesu |
+| IVesuPool adapter | Interface to Vesu lending pool |
+| Auto-compound logic | Reinvest yield (optional) |
+| Fee distribution | Split yield between users and protocol |
 
-### Stage 4: Bridge Integration (Atomiq)
-**Goal:** Real BTC → wBTC bridge flow
+**New Contracts:**
+```cairo
+// contracts/src/integrations/vesu_adapter.cairo
+#[starknet::interface]
+pub trait IVesuPool<TContractState> {
+    // Deposit wBTC to earn yield
+    fn deposit(ref self: TContractState, amount: u256) -> u256; // Returns shares
+
+    // Withdraw wBTC plus earned yield
+    fn withdraw(ref self: TContractState, shares: u256) -> u256; // Returns wBTC
+
+    // Check current exchange rate
+    fn get_exchange_rate(self: @TContractState) -> u256;
+
+    // Get user's share balance
+    fn balance_of(self: @TContractState, user: ContractAddress) -> u256;
+}
+
+// contracts/src/core/vesu_yield_manager.cairo
+#[starknet::contract]
+pub mod VesuYieldManager {
+    // Implements IYieldManager interface
+    // Routes deposits to Vesu pool
+    // Tracks shares per user (not raw amounts)
+    // Calculates yield as: (current_value - deposited_value)
+}
+```
+
+**Key Differences from MockYieldManager:**
+1. **Shares vs Amounts:** Track Vesu pool shares, not raw wBTC
+2. **Real Yield:** Yield comes from Vesu lending rates, not simulated
+3. **Compounding:** Yield auto-compounds in Vesu unless harvested
+4. **Risk:** Real smart contract risk from Vesu integration
+
+**Migration Path:**
+```cairo
+// Add to BTCUSDVault
+fn migrate_yield_manager(ref self: ContractState, new_manager: ContractAddress) {
+    self.ownable.assert_only_owner();
+
+    // 1. Withdraw all from old yield manager
+    let old_manager = IYieldManagerDispatcher { contract_address: self.yield_manager.read() };
+    old_manager.emergency_withdraw();
+
+    // 2. Set new manager
+    self.yield_manager.write(new_manager);
+
+    // 3. Deposit all to new manager
+    // (done per-user on next operation, or batch migration)
+}
+```
+
+---
+
+### Stage 4: Bridge Integration (Atomiq + Xverse)
+**Goal:** Real BTC → wBTC bridge flow with Xverse wallet integration
 
 | Component | Description |
 |-----------|-------------|
-| AtomiqAdapter | Monitor Bitcoin deposits |
-| Relayer service | Watch BTC chain, update Starknet |
-| Mobile BTC wallet flow | Xverse integration |
+| AtomiqAdapter | Interface to Atomiq bridge contracts |
+| Bridge relayer | Backend service for BTC confirmation |
+| Xverse/Sats Connect | Mobile wallet connection |
+| Deep linking | Open Xverse from BTCUSD app |
+
+**Atomiq Integration:**
+```typescript
+// backend/src/services/atomiq-bridge.ts
+interface AtomiqBridge {
+    // Generate deposit address for user
+    generateDepositAddress(starknetAddress: string): Promise<{
+        btcAddress: string;
+        expiresAt: number;
+    }>;
+
+    // Monitor for BTC confirmations
+    watchDeposit(btcAddress: string): Promise<{
+        txHash: string;
+        amount: bigint;
+        confirmations: number;
+    }>;
+
+    // Mint wBTC on Starknet once confirmed
+    completeBridge(
+        starknetAddress: string,
+        btcTxHash: string,
+        amount: bigint
+    ): Promise<string>; // Returns Starknet tx hash
+}
+```
+
+**Xverse/Sats Connect Integration:**
+```typescript
+// app/src/services/xverse.ts
+import { request, RpcMethod } from 'sats-connect';
+
+interface XverseWallet {
+    // Check if Xverse is installed (mobile: always false, use deep link)
+    isInstalled(): boolean;
+
+    // Connect and get BTC address
+    connect(): Promise<{
+        btcAddress: string;
+        starknetAddress?: string;
+    }>;
+
+    // Send BTC to bridge address
+    sendBTC(params: {
+        recipient: string;
+        amount: number;  // in satoshis
+    }): Promise<string>; // Returns BTC tx hash
+
+    // Deep link to Xverse browser with our app
+    openInXverse(url: string): void;
+}
+
+// Deep link format for mobile:
+// https://connect.xverse.app/browser?url=YOUR_APP_URL
+```
+
+**Mobile App Flow (Stage 4):**
+1. User taps "Deposit BTC"
+2. App requests deposit address from Atomiq
+3. Shows QR code OR opens Xverse via deep link
+4. User sends BTC from Xverse
+5. Backend monitors BTC tx, triggers wBTC mint
+6. App shows wBTC balance, user can deposit to vault
+
+**Backend: Bridge Relayer**
+```typescript
+// backend/src/services/bridge-relayer.ts
+class BridgeRelayer {
+    // Watch for incoming BTC deposits
+    async monitorDeposits() {
+        // Poll Atomiq API or use webhooks
+        // On confirmed deposit:
+        // 1. Verify amount matches
+        // 2. Call Atomiq contract to mint wBTC
+        // 3. Optionally auto-deposit to vault
+    }
+
+    // Handle withdrawals (wBTC → BTC)
+    async processWithdrawal(request: WithdrawalRequest) {
+        // 1. User burns wBTC on Starknet
+        // 2. Relayer initiates BTC payout via Atomiq
+        // 3. User receives BTC to their address
+    }
+}
+```
+
+---
 
 ### Stage 5: Public Testnet Launch
-**Goal:** Full system running on Sepolia
+**Goal:** Full system running on Starknet Sepolia
 
-| Component | Description |
-|-----------|-------------|
-| Deployment scripts | Automated testnet deployment |
-| Monitoring dashboard | Protocol health metrics |
-| Documentation | User guides, API docs |
-| Bug bounty prep | Security review |
+| Component | Description | Priority |
+|-----------|-------------|----------|
+| Deployment scripts | Automated testnet deployment | High |
+| Contract verification | Verify on Starkscan/Voyager | High |
+| Monitoring dashboard | Protocol health metrics | Medium |
+| User documentation | How-to guides | Medium |
+| Bug bounty setup | Immunefi or similar | Medium |
+
+**Deployment Checklist:**
+- [ ] Deploy all contracts to Sepolia
+- [ ] Verify contract source code
+- [ ] Set up proper access controls (multisig owner)
+- [ ] Configure oracle with Pragma testnet
+- [ ] Test full flow: deposit BTC → mint → yield → burn → withdraw
+- [ ] Set up monitoring (Prometheus + Grafana)
+- [ ] Deploy mobile app to TestFlight/Play Console
+- [ ] Write user documentation
+- [ ] Set up bug bounty program
+
+**Monitoring Dashboard:**
+```typescript
+// backend/src/services/monitoring.ts
+interface ProtocolMetrics {
+    // TVL
+    totalCollateral: bigint;
+    totalCollateralUSD: number;
+
+    // Debt
+    totalDebt: bigint;
+    totalDebtUSD: number;
+
+    // Health
+    globalCollateralRatio: number;
+    lowestHealthFactor: number;
+    positionsAtRisk: number;
+
+    // Yield
+    totalYieldGenerated: bigint;
+    currentAPY: number;
+
+    // Activity
+    dailyVolume: number;
+    activePositions: number;
+    dailyTransactions: number;
+}
+```
+
+---
 
 ### Stage 6: Audit & Mainnet Prep
 **Goal:** Production-ready protocol
 
-| Component | Description |
-|-----------|-------------|
-| Security audit | External audit firm |
-| Formal verification | Critical invariants |
-| Mainnet deployment | Production contracts |
-| Launch plan | Marketing, partnerships |
+| Component | Description | Timeline |
+|-----------|-------------|----------|
+| Internal review | Code freeze, final testing | Week 1-2 |
+| External audit | Professional security audit | Week 3-6 |
+| Fixes & re-audit | Address findings | Week 7-8 |
+| Formal verification | Invariant proofs (optional) | Week 7-8 |
+| Mainnet deployment | Production launch | Week 9 |
+
+**Audit Scope:**
+1. **Core Contracts:** BTCUSDToken, BTCUSDVault, YieldManager
+2. **Liquidation:** Liquidator contract, keeper logic
+3. **Integrations:** VesuAdapter, Oracle adapters
+4. **Access Control:** Owner functions, pause mechanisms
+5. **Economic Model:** Collateral ratios, liquidation math
+
+**Security Checklist:**
+- [ ] No reentrancy vulnerabilities
+- [ ] Integer overflow/underflow protection (Cairo handles this)
+- [ ] Access control properly implemented
+- [ ] Oracle manipulation resistance
+- [ ] Flash loan attack resistance
+- [ ] Front-running resistance
+- [ ] Emergency pause functionality
+- [ ] Upgrade timelock (if upgradeable)
+
+**Mainnet Launch Plan:**
+1. **Soft Launch:** Limited TVL cap ($100k), invite-only
+2. **Public Launch:** Remove cap, public access
+3. **Growth:** Marketing, partnerships, integrations
 
 ---
 
