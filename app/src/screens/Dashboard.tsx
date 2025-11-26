@@ -2,7 +2,7 @@
  * Dashboard Screen
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,44 +11,117 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { COLORS } from '../constants';
 import { useStore } from '../store';
+import { useStarknetWallet } from '../hooks';
 import { PositionCard, YieldCard, QuickActions } from '../components';
+import { Deposit } from './Deposit';
+import { Withdraw } from './Withdraw';
 
 export function Dashboard() {
-  const { wallet, position, yieldInfo, price, isLoading, refreshAll, setWallet } = useStore();
+  const { wallet, position, yieldInfo, price, isLoading, refreshAll } = useStore();
+  const {
+    address,
+    isConnected,
+    isConnecting,
+    connect,
+    disconnect,
+    availableConnectors,
+    harvest,
+    getTxUrl,
+  } = useStarknetWallet();
+
+  const [activeModal, setActiveModal] = useState<'deposit' | 'withdraw' | null>(null);
 
   const formatPrice = (value: bigint | null) => {
     if (!value) return '$--,---';
     return `$${(Number(value) / 1e8).toLocaleString()}`;
   };
 
-  const handleConnect = () => {
-    // Demo: simulate wallet connection with deployer address
-    setWallet({
-      address: '0x1f7bb20a9a9f073da23ab3319ec81e81289982b9afd1115269003a6c5f20acf',
-      isConnected: true,
-      chainId: 'SN_SEPOLIA',
-    });
-    // Refresh position after connecting
-    setTimeout(() => refreshAll(), 500);
+  const handleConnect = async () => {
+    if (isConnected) {
+      // Show disconnect option
+      Alert.alert(
+        'Wallet Connected',
+        `Connected to ${address?.slice(0, 10)}...${address?.slice(-6)}`,
+        [
+          { text: 'Disconnect', onPress: disconnect, style: 'destructive' },
+          { text: 'OK', style: 'cancel' },
+        ]
+      );
+      return;
+    }
+
+    // Show connector options
+    if (availableConnectors.length === 0) {
+      Alert.alert(
+        'No Wallet Found',
+        'Please install ArgentX or Braavos wallet extension to connect.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    try {
+      await connect();
+    } catch (error) {
+      Alert.alert('Connection Failed', 'Could not connect to wallet');
+    }
   };
 
   const handleAction = (actionId: string) => {
-    Alert.alert(
-      `${actionId.charAt(0).toUpperCase() + actionId.slice(1)}`,
-      `Contracts deployed! Visit Starkscan to interact:\nhttps://sepolia.starkscan.co/contract/0x07680fff5f34fee2e90912bce4a33870cde11c0bf3706737a94e947e274e58d4`,
-      [{ text: 'OK' }]
-    );
+    if (!isConnected) {
+      Alert.alert('Connect Wallet', 'Please connect your wallet first');
+      return;
+    }
+
+    switch (actionId) {
+      case 'deposit':
+        setActiveModal('deposit');
+        break;
+      case 'withdraw':
+        setActiveModal('withdraw');
+        break;
+      case 'mint':
+        // Mint is part of deposit flow
+        setActiveModal('deposit');
+        break;
+      case 'bridge':
+        Alert.alert(
+          'Bridge BTC',
+          'BTC bridging via Atomiq is coming soon. For now, use the MockWBTC faucet on Starkscan.',
+          [{ text: 'OK' }]
+        );
+        break;
+      default:
+        Alert.alert('Coming Soon', `${actionId} functionality is under development.`);
+    }
   };
 
-  const handleHarvest = () => {
-    Alert.alert(
-      'Harvest Yield',
-      'Yield harvesting is available via contract interaction. Visit Starkscan to call harvest_user_yield on the YieldManager.',
-      [{ text: 'OK' }]
-    );
+  const handleHarvest = async () => {
+    if (!isConnected) {
+      Alert.alert('Connect Wallet', 'Please connect your wallet first');
+      return;
+    }
+
+    try {
+      const result = await harvest();
+      Alert.alert(
+        'Harvest Submitted',
+        `Transaction submitted!\n\nView on Starkscan:\n${getTxUrl(result.hash)}`,
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      Alert.alert('Harvest Failed', 'Could not harvest yield. Try again later.');
+    }
+  };
+
+  const closeModal = () => {
+    setActiveModal(null);
+    refreshAll();
   };
 
   return (
@@ -60,12 +133,17 @@ export function Dashboard() {
           <Text style={styles.subtitle}>Bitcoin-Backed Stablecoin</Text>
         </View>
         <TouchableOpacity
-          style={styles.connectButton}
-          onPress={wallet.isConnected ? undefined : handleConnect}
+          style={[styles.connectButton, isConnected && styles.connectedButton]}
+          onPress={handleConnect}
+          disabled={isConnecting}
         >
-          <Text style={styles.connectButtonText}>
-            {wallet.isConnected ? wallet.address?.slice(0, 8) + '...' : 'Connect'}
-          </Text>
+          {isConnecting ? (
+            <ActivityIndicator color={COLORS.text} size="small" />
+          ) : (
+            <Text style={styles.connectButtonText}>
+              {isConnected ? address?.slice(0, 6) + '...' + address?.slice(-4) : 'Connect'}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -137,6 +215,24 @@ export function Dashboard() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Deposit Modal */}
+      <Modal
+        visible={activeModal === 'deposit'}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <Deposit onBack={closeModal} onSuccess={closeModal} />
+      </Modal>
+
+      {/* Withdraw Modal */}
+      <Modal
+        visible={activeModal === 'withdraw'}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <Withdraw onBack={closeModal} onSuccess={closeModal} />
+      </Modal>
     </View>
   );
 }
@@ -170,6 +266,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: COLORS.border,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  connectedButton: {
+    backgroundColor: COLORS.success + '20',
+    borderColor: COLORS.success,
   },
   connectButtonText: {
     color: COLORS.text,

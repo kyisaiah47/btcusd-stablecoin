@@ -36,7 +36,7 @@ export interface WalletState {
 
 export interface Transaction {
   hash: string;
-  type: 'deposit' | 'withdraw' | 'mint' | 'burn' | 'harvest' | 'unknown';
+  type: 'deposit' | 'withdraw' | 'mint' | 'burn' | 'harvest' | 'approve' | 'unknown';
   status: 'pending' | 'confirmed' | 'failed';
   timestamp: number;
   amount?: bigint;

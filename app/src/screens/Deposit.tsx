@@ -16,11 +16,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { COLORS, PROTOCOL } from '../constants';
 import { useStore } from '../store';
-import { usePosition } from '../hooks';
-import { formatWBTC, parseWBTC } from '../services/starknet';
+import { usePosition, useStarknetWallet } from '../hooks';
+import { formatWBTC, parseWBTC, parseBTCUSD } from '../services/starknet';
 
 interface Props {
   onBack?: () => void;
@@ -36,6 +37,13 @@ export function Deposit({ onBack, onSuccess }: Props) {
     calculateMaxMint,
     calculateNewHealthFactor,
   } = usePosition();
+  const {
+    isConnected,
+    deposit,
+    mint,
+    depositAndMint,
+    getTxUrl,
+  } = useStarknetWallet();
 
   const [amount, setAmount] = useState('');
   const [isDepositing, setIsDepositing] = useState(false);
@@ -65,7 +73,7 @@ export function Deposit({ onBack, onSuccess }: Props) {
 
   // Handle deposit
   const handleDeposit = async () => {
-    if (!wallet.isConnected || !wallet.address) {
+    if (!isConnected) {
       Alert.alert('Not Connected', 'Please connect your wallet first');
       return;
     }
@@ -83,27 +91,49 @@ export function Deposit({ onBack, onSuccess }: Props) {
     setIsDepositing(true);
 
     try {
-      // TODO: Execute deposit transaction
-      // 1. Approve wBTC spending by vault
-      // 2. Call vault.deposit_collateral(amount)
-      console.log('Depositing:', formatWBTC(depositAmount), 'wBTC');
+      let txHash: string;
 
-      // Simulate transaction
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      Alert.alert(
-        'Deposit Successful',
-        `Deposited ${formatWBTC(depositAmount)} wBTC`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              refreshAll();
-              if (onSuccess) onSuccess();
+      if (showMintOption && mintAmount) {
+        // Deposit and mint in one flow
+        const mintAmountBigInt = parseBTCUSD(mintAmount);
+        await depositAndMint(depositAmount, mintAmountBigInt);
+        txHash = ''; // Multiple transactions
+        Alert.alert(
+          'Transactions Submitted',
+          `Deposit and mint transactions have been submitted. Check your wallet for status.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => {
+                refreshAll();
+                if (onSuccess) onSuccess();
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      } else {
+        // Just deposit
+        const result = await deposit(depositAmount);
+        txHash = result.hash;
+
+        Alert.alert(
+          'Deposit Submitted',
+          `Transaction submitted!\n\nView on Starkscan:`,
+          [
+            {
+              text: 'View Transaction',
+              onPress: () => Linking.openURL(getTxUrl(txHash)),
+            },
+            {
+              text: 'OK',
+              onPress: () => {
+                refreshAll();
+                if (onSuccess) onSuccess();
+              },
+            },
+          ]
+        );
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Deposit failed';
       Alert.alert('Deposit Failed', message);

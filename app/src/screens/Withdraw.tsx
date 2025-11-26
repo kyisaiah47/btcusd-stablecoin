@@ -16,10 +16,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { COLORS, PROTOCOL } from '../constants';
 import { useStore } from '../store';
-import { usePosition } from '../hooks';
+import { usePosition, useStarknetWallet } from '../hooks';
 import { formatWBTC, formatBTCUSD, parseWBTC } from '../services/starknet';
 
 interface Props {
@@ -36,6 +37,7 @@ export function Withdraw({ onBack, onSuccess }: Props) {
     calculateMaxWithdraw,
     calculateNewHealthFactor,
   } = usePosition();
+  const { isConnected, withdraw, getTxUrl } = useStarknetWallet();
 
   const [amount, setAmount] = useState('');
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -70,7 +72,7 @@ export function Withdraw({ onBack, onSuccess }: Props) {
 
   // Handle withdraw
   const handleWithdraw = async () => {
-    if (!wallet.isConnected || !wallet.address) {
+    if (!isConnected) {
       Alert.alert('Not Connected', 'Please connect your wallet first');
       return;
     }
@@ -99,17 +101,16 @@ export function Withdraw({ onBack, onSuccess }: Props) {
     setIsWithdrawing(true);
 
     try {
-      // TODO: Execute withdraw transaction
-      // Call vault.withdraw_collateral(amount)
-      console.log('Withdrawing:', formatWBTC(withdrawAmount), 'wBTC');
-
-      // Simulate transaction
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      const result = await withdraw(withdrawAmount);
 
       Alert.alert(
-        'Withdrawal Successful',
-        `Withdrew ${formatWBTC(withdrawAmount)} wBTC`,
+        'Withdrawal Submitted',
+        `Transaction submitted!\n\nView on Starkscan:`,
         [
+          {
+            text: 'View Transaction',
+            onPress: () => Linking.openURL(getTxUrl(result.hash)),
+          },
           {
             text: 'OK',
             onPress: () => {

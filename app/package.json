@@ -9,12 +9,17 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@starknet-react/chains": "^5.0.3",
+    "@starknet-react/core": "^5.0.3",
     "expo": "~54.0.25",
     "expo-linking": "^8.0.9",
     "expo-status-bar": "~3.0.8",
+    "get-starknet-core": "^4.0.0",
     "react": "19.1.0",
+    "react-dom": "19.1.0",
     "react-native": "0.81.5",
     "react-native-svg": "^15.15.0",
+    "react-native-web": "^0.21.0",
     "sats-connect": "^4.2.1",
     "starknet": "^8.9.0",
     "zustand": "^5.0.8"

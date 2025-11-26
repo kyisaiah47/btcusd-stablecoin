@@ -5,10 +5,11 @@
 
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
+import { StarknetProvider } from './src/providers';
 import { Dashboard } from './src/screens/Dashboard';
 import { useStore } from './src/store';
 
-export default function App() {
+function AppContent() {
   const { refreshPrice, setPrice } = useStore();
 
   useEffect(() => {
@@ -37,5 +38,13 @@ export default function App() {
       <StatusBar style="light" />
       <Dashboard />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <StarknetProvider>
+      <AppContent />
+    </StarknetProvider>
   );
 }
