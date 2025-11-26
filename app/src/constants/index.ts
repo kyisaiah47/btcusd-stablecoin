@@ -38,17 +38,41 @@ export const NETWORK = {
   EXPLORER: 'https://sepolia.starkscan.co',
 } as const;
 
-// UI constants
+// UI constants - Purple/Pink DeFi theme
 export const COLORS = {
-  primary: '#F7931A', // Bitcoin orange
-  secondary: '#4A90A4',
-  success: '#4CAF50',
-  warning: '#FFC107',
-  danger: '#F44336',
-  background: '#0D1117',
-  surface: '#161B22',
-  surfaceLight: '#21262D',
+  // Primary palette - Pink
+  primary: '#FF82FC',
+  primaryLight: '#FFA8FE',
+  primaryDark: '#E060E0',
+
+  // Accent colors - Purple
+  secondary: '#D46BFF',
+  accent: '#B44EE0',
+
+  // Status colors
+  success: '#4ADE80',
+  warning: '#FBBF24',
+  danger: '#FF4757',
+
+  // Background - deep dark
+  background: '#161316',
+  backgroundGradientStart: '#1E1A1E',
+  backgroundGradientEnd: '#161316',
+
+  // Surface/Card colors - glassmorphism
+  surface: 'rgba(255, 255, 255, 0.06)',
+  surfaceLight: 'rgba(255, 255, 255, 0.10)',
+  surfaceBorder: 'rgba(255, 255, 255, 0.12)',
+
+  // Glass effect
+  glass: 'rgba(255, 255, 255, 0.04)',
+  glassBorder: 'rgba(255, 255, 255, 0.10)',
+
+  // Text
   text: '#FFFFFF',
-  textSecondary: '#8B949E',
-  border: '#30363D',
+  textSecondary: '#A3A3A3',
+  textMuted: 'rgba(255, 255, 255, 0.4)',
+
+  // Border
+  border: 'rgba(255, 255, 255, 0.12)',
 } as const;

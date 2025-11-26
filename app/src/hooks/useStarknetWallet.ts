@@ -24,6 +24,7 @@ import {
   burnAndWithdraw,
   waitForTransaction,
   getTransactionUrl,
+  mintTestWBTC,
   TransactionResult,
 } from '../services/transactions';
 
@@ -50,6 +51,7 @@ export interface StarknetWalletActions {
   mint: (amount: bigint) => Promise<TransactionResult>;
   burn: (amount: bigint) => Promise<TransactionResult>;
   harvest: () => Promise<TransactionResult>;
+  faucet: () => Promise<TransactionResult>;
 
   // Combined operations
   depositAndMint: (depositAmt: bigint, mintAmt: bigint) => Promise<void>;
@@ -204,6 +206,15 @@ export function useStarknetWallet(): StarknetWalletState & StarknetWalletActions
     );
   }, [accountInstance, address, executeTransaction]);
 
+  // Faucet - mint test wBTC
+  const faucet = useCallback(async (): Promise<TransactionResult> => {
+    if (!accountInstance || !address) throw new Error('Wallet not connected');
+    return executeTransaction(
+      () => mintTestWBTC(accountInstance, address, 100000000n), // 1 wBTC
+      'faucet'
+    );
+  }, [accountInstance, address, executeTransaction]);
+
   // Deposit and mint combined
   const depositAndMintFn = useCallback(
     async (depositAmt: bigint, mintAmt: bigint): Promise<void> => {
@@ -291,6 +302,7 @@ export function useStarknetWallet(): StarknetWalletState & StarknetWalletActions
     mint,
     burn,
     harvest,
+    faucet,
     depositAndMint: depositAndMintFn,
     burnAndWithdraw: burnAndWithdrawFn,
     waitForTx,

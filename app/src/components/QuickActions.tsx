@@ -1,10 +1,13 @@
 /**
  * Quick Actions Component
+ *
+ * Action buttons with modern pill-style design.
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS } from '../constants';
+import { GlassCard } from './GlassCard';
 
 interface Action {
   id: string;
@@ -18,15 +21,15 @@ interface Props {
 }
 
 const actions: Action[] = [
-  { id: 'bridge', label: 'Bridge BTC', icon: 'B', color: COLORS.primary },
-  { id: 'deposit', label: 'Deposit', icon: '+', color: COLORS.success },
-  { id: 'mint', label: 'Mint', icon: '$', color: COLORS.secondary },
-  { id: 'withdraw', label: 'Withdraw', icon: '-', color: COLORS.warning },
+  { id: 'faucet', label: 'Faucet', icon: '💧', color: COLORS.secondary },
+  { id: 'deposit', label: 'Deposit', icon: '+', color: COLORS.primary },
+  { id: 'mint', label: 'Mint', icon: '$', color: COLORS.accent },
+  { id: 'withdraw', label: 'Withdraw', icon: '−', color: COLORS.textSecondary },
 ];
 
 export function QuickActions({ onAction }: Props) {
   return (
-    <View style={styles.container}>
+    <GlassCard style={styles.container}>
       <Text style={styles.title}>Quick Actions</Text>
       <View style={styles.actionsRow}>
         {actions.map((action) => (
@@ -34,32 +37,28 @@ export function QuickActions({ onAction }: Props) {
             key={action.id}
             style={styles.actionButton}
             onPress={() => onAction(action.id)}
+            activeOpacity={0.7}
           >
             <View style={[styles.iconContainer, { backgroundColor: action.color + '20' }]}>
-              <Text style={styles.icon}>{action.icon}</Text>
+              <Text style={[styles.icon, { color: action.color }]}>{action.icon}</Text>
             </View>
             <Text style={styles.actionLabel}>{action.label}</Text>
           </TouchableOpacity>
         ))}
       </View>
-    </View>
+    </GlassCard>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   title: {
     color: COLORS.text,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   actionsRow: {
     flexDirection: 'row',
@@ -72,13 +71,16 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 56,
     height: 56,
-    borderRadius: 28,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
   },
   icon: {
     fontSize: 24,
+    fontWeight: '600',
   },
   actionLabel: {
     color: COLORS.textSecondary,

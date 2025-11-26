@@ -21,6 +21,7 @@ import {
 import { COLORS, PROTOCOL } from '../constants';
 import { useStore } from '../store';
 import { usePosition, useStarknetWallet } from '../hooks';
+import { GlassCard } from '../components';
 import { formatWBTC, parseWBTC, parseBTCUSD } from '../services/starknet';
 
 interface Props {
@@ -162,7 +163,7 @@ export function Deposit({ onBack, onSuccess }: Props) {
         </View>
 
         {/* Balance Card */}
-        <View style={styles.balanceCard}>
+        <GlassCard style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>Available wBTC</Text>
           <Text style={styles.balanceValue}>{formatWBTC(wbtcBalance)} wBTC</Text>
           <Text style={styles.balanceUSD}>
@@ -170,7 +171,7 @@ export function Deposit({ onBack, onSuccess }: Props) {
               ? `$${((Number(wbtcBalance) / 1e8) * (Number(btcPrice) / 1e8)).toLocaleString()}`
               : '--'}
           </Text>
-        </View>
+        </GlassCard>
 
         {/* Input Section */}
         <View style={styles.inputSection}>
@@ -200,14 +201,14 @@ export function Deposit({ onBack, onSuccess }: Props) {
 
         {/* Position Preview */}
         {depositAmount > 0n && (
-          <View style={styles.previewCard}>
+          <GlassCard style={styles.previewCard}>
             <Text style={styles.previewTitle}>Position Preview</Text>
 
             <View style={styles.previewRow}>
               <Text style={styles.previewLabel}>Total Collateral</Text>
               <View style={styles.previewValues}>
                 <Text style={styles.previewOld}>{formatWBTC(collateral)}</Text>
-                <Text style={styles.previewArrow}>-&gt;</Text>
+                <Text style={styles.previewArrow}>→</Text>
                 <Text style={styles.previewNew}>{formatWBTC(newCollateral)}</Text>
               </View>
             </View>
@@ -218,7 +219,7 @@ export function Deposit({ onBack, onSuccess }: Props) {
                 <Text style={styles.previewOld}>
                   {debt > 0n ? `${(collateralRatio / 100).toFixed(1)}%` : '--'}
                 </Text>
-                <Text style={styles.previewArrow}>-&gt;</Text>
+                <Text style={styles.previewArrow}>→</Text>
                 <Text
                   style={[
                     styles.previewNew,
@@ -232,13 +233,13 @@ export function Deposit({ onBack, onSuccess }: Props) {
               </View>
             </View>
 
-            <View style={styles.previewRow}>
+            <View style={[styles.previewRow, { marginBottom: 0 }]}>
               <Text style={styles.previewLabel}>Max Mintable</Text>
               <Text style={styles.previewValue}>
                 {(Number(maxMintable) / 1e18).toLocaleString()} BTCUSD
               </Text>
             </View>
-          </View>
+          </GlassCard>
         )}
 
         {/* Mint Option */}
@@ -295,15 +296,15 @@ export function Deposit({ onBack, onSuccess }: Props) {
         </TouchableOpacity>
 
         {/* Info */}
-        <View style={styles.infoCard}>
+        <GlassCard style={styles.infoCard}>
           <Text style={styles.infoTitle}>About Deposits</Text>
           <Text style={styles.infoText}>
-            - Minimum collateral ratio: 150%{'\n'}
-            - Liquidation threshold: 120%{'\n'}
-            - Maximum LTV: 66.67%{'\n'}
-            - Your collateral earns yield via Vesu
+            • Minimum collateral ratio: 150%{'\n'}
+            • Liquidation threshold: 120%{'\n'}
+            • Maximum LTV: 66.67%{'\n'}
+            • Your collateral earns yield via Vesu
           </Text>
-        </View>
+        </GlassCard>
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -13,11 +13,12 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { COLORS } from '../constants';
 import { useStore } from '../store';
 import { useStarknetWallet } from '../hooks';
-import { PositionCard, YieldCard, QuickActions } from '../components';
+import { GlassCard, PositionCard, YieldCard, QuickActions } from '../components';
 import { Deposit } from './Deposit';
 import { Withdraw } from './Withdraw';
 
@@ -31,10 +32,11 @@ export function Dashboard() {
     disconnect,
     availableConnectors,
     harvest,
+    faucet,
     getTxUrl,
   } = useStarknetWallet();
 
-  const [activeModal, setActiveModal] = useState<'deposit' | 'withdraw' | null>(null);
+  const [activeModal, setActiveModal] = useState<'deposit' | 'withdraw' | 'wallet' | null>(null);
 
   const formatPrice = (value: bigint | null) => {
     if (!value) return '$--,---';
@@ -55,20 +57,19 @@ export function Dashboard() {
       return;
     }
 
-    // Show connector options
-    if (availableConnectors.length === 0) {
-      Alert.alert(
-        'No Wallet Found',
-        'Please install ArgentX or Braavos wallet extension to connect.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
+    // Always show wallet modal for better UX
+    setActiveModal('wallet');
+  };
 
+  const handleWalletSelect = async (connectorId: string) => {
+    setActiveModal(null);
     try {
-      await connect();
+      await connect(connectorId);
     } catch (error) {
-      Alert.alert('Connection Failed', 'Could not connect to wallet');
+      Alert.alert(
+        'Connection Failed',
+        'Could not connect to wallet. Make sure the extension is installed and unlocked.'
+      );
     }
   };
 
@@ -92,12 +93,42 @@ export function Dashboard() {
       case 'bridge':
         Alert.alert(
           'Bridge BTC',
-          'BTC bridging via Atomiq is coming soon. For now, use the MockWBTC faucet on Starkscan.',
+          'BTC bridging via Atomiq is coming soon. Use the Faucet button to get test wBTC.',
           [{ text: 'OK' }]
         );
         break;
+      case 'faucet':
+        handleFaucet();
+        break;
       default:
         Alert.alert('Coming Soon', `${actionId} functionality is under development.`);
+    }
+  };
+
+  const handleFaucet = async () => {
+    if (!isConnected) {
+      Alert.alert('Connect Wallet', 'Please connect your wallet first');
+      return;
+    }
+
+    try {
+      const result = await faucet();
+      Alert.alert(
+        'Faucet Success!',
+        `1 wBTC is being sent to your wallet.\n\nTransaction: ${result.hash.slice(0, 20)}...`,
+        [
+          {
+            text: 'View Transaction',
+            onPress: () => Linking.openURL(getTxUrl(result.hash)),
+          },
+          {
+            text: 'OK',
+            onPress: () => refreshAll(),
+          },
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Faucet Failed', 'Could not mint test wBTC. Try again later.');
     }
   };
 
@@ -148,7 +179,7 @@ export function Dashboard() {
       </View>
 
       {/* Price Banner */}
-      <View style={styles.priceBanner}>
+      <GlassCard style={styles.priceBanner} padding="small">
         <View style={styles.priceItem}>
           <Text style={styles.priceLabel}>BTC Price</Text>
           <Text style={styles.priceValue}>{formatPrice(price?.btcPrice ?? null)}</Text>
@@ -156,9 +187,12 @@ export function Dashboard() {
         <View style={styles.priceDivider} />
         <View style={styles.priceItem}>
           <Text style={styles.priceLabel}>Network</Text>
-          <Text style={styles.networkValue}>Sepolia</Text>
+          <View style={styles.networkBadge}>
+            <View style={styles.networkDot} />
+            <Text style={styles.networkValue}>Sepolia</Text>
+          </View>
         </View>
-      </View>
+      </GlassCard>
 
       {/* Scrollable Content */}
       <ScrollView
@@ -178,10 +212,12 @@ export function Dashboard() {
         <YieldCard yieldInfo={yieldInfo} onHarvest={handleHarvest} />
 
         {/* Info Card */}
-        <View style={styles.infoCard}>
+        <GlassCard style={styles.infoCard}>
           <Text style={styles.infoTitle}>How It Works</Text>
           <View style={styles.infoStep}>
-            <Text style={styles.stepNumber}>1</Text>
+            <View style={styles.stepNumberContainer}>
+              <Text style={styles.stepNumber}>1</Text>
+            </View>
             <View style={styles.stepContent}>
               <Text style={styles.stepTitle}>Deposit wBTC</Text>
               <Text style={styles.stepDescription}>
@@ -190,7 +226,9 @@ export function Dashboard() {
             </View>
           </View>
           <View style={styles.infoStep}>
-            <Text style={styles.stepNumber}>2</Text>
+            <View style={[styles.stepNumberContainer, { backgroundColor: COLORS.secondary + '20' }]}>
+              <Text style={[styles.stepNumber, { color: COLORS.secondary }]}>2</Text>
+            </View>
             <View style={styles.stepContent}>
               <Text style={styles.stepTitle}>Mint BTCUSD</Text>
               <Text style={styles.stepDescription}>
@@ -198,8 +236,10 @@ export function Dashboard() {
               </Text>
             </View>
           </View>
-          <View style={styles.infoStep}>
-            <Text style={styles.stepNumber}>3</Text>
+          <View style={[styles.infoStep, { marginBottom: 0 }]}>
+            <View style={[styles.stepNumberContainer, { backgroundColor: COLORS.accent + '20' }]}>
+              <Text style={[styles.stepNumber, { color: COLORS.accent }]}>3</Text>
+            </View>
             <View style={styles.stepContent}>
               <Text style={styles.stepTitle}>Earn Yield</Text>
               <Text style={styles.stepDescription}>
@@ -207,7 +247,7 @@ export function Dashboard() {
               </Text>
             </View>
           </View>
-        </View>
+        </GlassCard>
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
@@ -233,6 +273,76 @@ export function Dashboard() {
       >
         <Withdraw onBack={closeModal} onSuccess={closeModal} />
       </Modal>
+
+      {/* Wallet Selection Modal */}
+      <Modal
+        visible={activeModal === 'wallet'}
+        animationType="fade"
+        transparent={true}
+      >
+        <View style={styles.walletModalOverlay}>
+          <View style={styles.walletModal}>
+            <Text style={styles.walletModalTitle}>Connect Wallet</Text>
+            <Text style={styles.walletModalSubtitle}>
+              Choose a wallet to connect to BTCUSD Protocol
+            </Text>
+
+            {/* ArgentX */}
+            <TouchableOpacity
+              style={styles.walletOption}
+              onPress={() => handleWalletSelect('argentX')}
+            >
+              <View style={styles.walletIconPlaceholder}>
+                <Text style={styles.walletIconText}>A</Text>
+              </View>
+              <View style={styles.walletInfo}>
+                <Text style={styles.walletName}>ArgentX</Text>
+                <Text style={styles.walletDesc}>Most popular Starknet wallet</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Braavos */}
+            <TouchableOpacity
+              style={styles.walletOption}
+              onPress={() => handleWalletSelect('braavos')}
+            >
+              <View style={[styles.walletIconPlaceholder, { backgroundColor: '#FF6B35' }]}>
+                <Text style={styles.walletIconText}>B</Text>
+              </View>
+              <View style={styles.walletInfo}>
+                <Text style={styles.walletName}>Braavos</Text>
+                <Text style={styles.walletDesc}>Smart wallet with hardware signer</Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Install Links */}
+            <View style={styles.installSection}>
+              <Text style={styles.installTitle}>Don't have a wallet?</Text>
+              <View style={styles.installLinks}>
+                <TouchableOpacity
+                  onPress={() => Linking.openURL('https://www.argent.xyz/argent-x/')}
+                >
+                  <Text style={styles.installLink}>Install ArgentX</Text>
+                </TouchableOpacity>
+                <Text style={styles.installDivider}>|</Text>
+                <TouchableOpacity
+                  onPress={() => Linking.openURL('https://braavos.app/')}
+                >
+                  <Text style={styles.installLink}>Install Braavos</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Close Button */}
+            <TouchableOpacity
+              style={styles.walletCloseBtn}
+              onPress={() => setActiveModal(null)}
+            >
+              <Text style={styles.walletCloseBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -252,26 +362,28 @@ const styles = StyleSheet.create({
   },
   logo: {
     color: COLORS.primary,
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '800',
+    letterSpacing: -1,
   },
   subtitle: {
     color: COLORS.textSecondary,
     fontSize: 12,
+    marginTop: 2,
   },
   connectButton: {
     backgroundColor: COLORS.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    minWidth: 100,
+    borderColor: COLORS.glassBorder,
+    minWidth: 110,
     alignItems: 'center',
   },
   connectedButton: {
-    backgroundColor: COLORS.success + '20',
-    borderColor: COLORS.success,
+    backgroundColor: COLORS.secondary + '15',
+    borderColor: COLORS.secondary + '40',
   },
   connectButtonText: {
     color: COLORS.text,
@@ -280,91 +392,205 @@ const styles = StyleSheet.create({
   },
   priceBanner: {
     flexDirection: 'row',
-    backgroundColor: COLORS.surface,
     marginHorizontal: 20,
     marginBottom: 16,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   priceItem: {
     flex: 1,
     alignItems: 'center',
+    paddingVertical: 8,
   },
   priceLabel: {
-    color: COLORS.textSecondary,
-    fontSize: 12,
-    marginBottom: 4,
+    color: COLORS.textMuted,
+    fontSize: 11,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   priceValue: {
     color: COLORS.primary,
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
   },
+  networkBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  networkDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: COLORS.secondary,
+    marginRight: 6,
+  },
   networkValue: {
-    color: COLORS.success,
+    color: COLORS.secondary,
     fontSize: 16,
     fontWeight: '600',
   },
   priceDivider: {
     width: 1,
     backgroundColor: COLORS.border,
-    marginHorizontal: 16,
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
   },
   infoCard: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   infoTitle: {
     color: COLORS.text,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   infoStep: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: 16,
   },
+  stepNumberContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
   stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: COLORS.primary,
-    color: COLORS.text,
-    fontSize: 14,
+    color: COLORS.primary,
+    fontSize: 16,
     fontWeight: '700',
-    textAlign: 'center',
-    lineHeight: 28,
-    marginRight: 12,
   },
   stepContent: {
     flex: 1,
+    paddingTop: 2,
   },
   stepTitle: {
     color: COLORS.text,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   stepDescription: {
     color: COLORS.textSecondary,
-    fontSize: 12,
+    fontSize: 13,
+    lineHeight: 18,
   },
   footer: {
     alignItems: 'center',
     paddingVertical: 32,
   },
   footerText: {
-    color: COLORS.textSecondary,
+    color: COLORS.textMuted,
     fontSize: 12,
+  },
+  // Wallet Modal Styles
+  walletModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 7, 3, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  walletModal: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 24,
+    padding: 28,
+    width: '100%',
+    maxWidth: 400,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+  },
+  walletModalTitle: {
+    color: COLORS.text,
+    fontSize: 26,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  walletModalSubtitle: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 28,
+  },
+  walletOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.glass,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+  },
+  walletIconPlaceholder: {
+    width: 52,
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  walletIconText: {
+    color: COLORS.background,
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  walletInfo: {
+    flex: 1,
+  },
+  walletName: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  walletDesc: {
+    color: COLORS.textMuted,
+    fontSize: 13,
+  },
+  installSection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    alignItems: 'center',
+  },
+  installTitle: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  installLinks: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  installLink: {
+    color: COLORS.primary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  installDivider: {
+    color: COLORS.textMuted,
+    marginHorizontal: 12,
+  },
+  walletCloseBtn: {
+    marginTop: 24,
+    paddingVertical: 16,
+    borderRadius: 16,
+    backgroundColor: COLORS.surfaceLight,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
+  },
+  walletCloseBtnText: {
+    color: COLORS.textSecondary,
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

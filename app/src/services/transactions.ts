@@ -10,7 +10,7 @@ import { CONTRACTS, PROTOCOL } from '../constants';
 import { VAULT_ABI, WBTC_ABI, TOKEN_ABI, YIELD_MANAGER_ABI } from '../constants/abis';
 
 // Transaction types
-export type TransactionType = 'deposit' | 'withdraw' | 'mint' | 'burn' | 'harvest' | 'approve';
+export type TransactionType = 'deposit' | 'withdraw' | 'mint' | 'burn' | 'harvest' | 'approve' | 'faucet';
 
 export interface TransactionResult {
   hash: string;
@@ -230,6 +230,31 @@ export async function burnAndWithdraw(
   const withdrawTx = await withdrawCollateral(account, withdrawAmount);
 
   return { burnTx, withdrawTx };
+}
+
+/**
+ * Faucet - Mint test wBTC (testnet only!)
+ */
+export async function mintTestWBTC(
+  account: Account,
+  toAddress: string,
+  amount: bigint = 100000000n // 1 wBTC default
+): Promise<TransactionResult> {
+  try {
+    const wbtcContract = createContract(WBTC_ABI as any, CONTRACTS.WBTC, account);
+    const amountU256 = uint256.bnToUint256(amount);
+
+    const tx = await wbtcContract.invoke('mint', [toAddress, amountU256]);
+
+    return {
+      hash: tx.transaction_hash,
+      status: 'pending',
+      type: 'faucet',
+    };
+  } catch (error) {
+    console.error('Faucet error:', error);
+    throw error;
+  }
 }
 
 /**

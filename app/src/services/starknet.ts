@@ -220,8 +220,14 @@ export async function getUserYieldInfo(userAddress: string): Promise<{
       lastUpdate: Number(result[6] ?? 0),
     };
   } catch (error) {
-    console.error('Error getting user yield info:', error);
-    throw error;
+    // Return default values if contract call fails (contract may not have this function)
+    console.warn('Yield info not available:', error);
+    return {
+      deposited: 0n,
+      pendingYield: 0n,
+      cumulativeYield: 0n,
+      lastUpdate: 0,
+    };
   }
 }
 

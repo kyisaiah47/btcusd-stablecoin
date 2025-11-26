@@ -1,10 +1,13 @@
 /**
  * Yield Card Component
+ *
+ * Displays yield earnings with glassmorphism styling.
  */
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS } from '../constants';
+import { GlassCard } from './GlassCard';
 import type { YieldInfo } from '../types';
 
 interface Props {
@@ -20,21 +23,23 @@ export function YieldCard({ yieldInfo, onHarvest }: Props) {
 
   if (!yieldInfo || yieldInfo.pendingYield === 0n) {
     return (
-      <View style={styles.card}>
+      <GlassCard style={styles.container}>
         <Text style={styles.title}>Yield Earnings</Text>
         <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>📈</Text>
+          <View style={styles.emptyIconContainer}>
+            <Text style={styles.emptyIcon}>%</Text>
+          </View>
           <Text style={styles.emptyText}>No yield deposits</Text>
           <Text style={styles.emptySubtext}>
             Deposit wBTC to start earning yield through Vesu
           </Text>
         </View>
-      </View>
+      </GlassCard>
     );
   }
 
   return (
-    <View style={styles.card}>
+    <GlassCard style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Yield Earnings</Text>
         <View style={styles.apyBadge}>
@@ -44,20 +49,23 @@ export function YieldCard({ yieldInfo, onHarvest }: Props) {
 
       <View style={styles.row}>
         <View style={styles.stat}>
-          <Text style={styles.label}>Pending Yield</Text>
-          <Text style={styles.value}>{formatBTC(yieldInfo.pendingYield)} wBTC</Text>
+          <Text style={styles.label}>Total Deposited</Text>
+          <Text style={styles.value}>{formatBTC(yieldInfo.deposited)}</Text>
+          <Text style={styles.unit}>wBTC</Text>
         </View>
+        <View style={styles.divider} />
         <View style={styles.stat}>
           <Text style={styles.label}>Total Earned</Text>
           <Text style={[styles.value, styles.earned]}>
-            +{formatBTC(yieldInfo.cumulativeYield)} wBTC
+            +{formatBTC(yieldInfo.cumulativeYield)}
           </Text>
+          <Text style={styles.unit}>wBTC</Text>
         </View>
       </View>
 
       <View style={styles.pendingSection}>
         <View style={styles.pendingInfo}>
-          <Text style={styles.label}>Pending Yield</Text>
+          <Text style={styles.pendingLabel}>Pending Yield</Text>
           <Text style={styles.pendingValue}>
             {formatBTC(yieldInfo.pendingYield)} wBTC
           </Text>
@@ -69,56 +77,63 @@ export function YieldCard({ yieldInfo, onHarvest }: Props) {
           ]}
           onPress={onHarvest}
           disabled={yieldInfo.pendingYield === 0n}
+          activeOpacity={0.8}
         >
           <Text style={styles.harvestButtonText}>Harvest</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </GlassCard>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: 16,
-    padding: 20,
+  container: {
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   title: {
     color: COLORS.text,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
   },
   apyBadge: {
-    backgroundColor: COLORS.success + '20',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    backgroundColor: COLORS.secondary + '20',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.secondary + '40',
   },
   apyText: {
-    color: COLORS.success,
+    color: COLORS.secondary,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 24,
+    paddingVertical: 32,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: COLORS.surfaceLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+    fontSize: 36,
+    color: COLORS.secondary,
   },
   emptyText: {
     color: COLORS.text,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
   },
@@ -126,56 +141,83 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 14,
     textAlign: 'center',
+    paddingHorizontal: 20,
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   stat: {
     flex: 1,
+    alignItems: 'center',
+  },
+  divider: {
+    width: 1,
+    backgroundColor: COLORS.border,
+    marginHorizontal: 16,
   },
   label: {
     color: COLORS.textSecondary,
     fontSize: 12,
     marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   value: {
     color: COLORS.text,
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  unit: {
+    color: COLORS.textMuted,
+    fontSize: 14,
+    marginTop: 2,
   },
   earned: {
-    color: COLORS.success,
+    color: COLORS.secondary,
   },
   pendingSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: COLORS.surfaceLight,
-    borderRadius: 12,
+    backgroundColor: COLORS.glass,
+    borderRadius: 16,
     padding: 16,
+    borderWidth: 1,
+    borderColor: COLORS.glassBorder,
   },
   pendingInfo: {
     flex: 1,
   },
+  pendingLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    marginBottom: 4,
+  },
   pendingValue: {
     color: COLORS.primary,
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   harvestButton: {
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.secondary,
     paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    shadowColor: COLORS.secondary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   harvestButtonDisabled: {
-    backgroundColor: COLORS.border,
+    backgroundColor: COLORS.surfaceLight,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   harvestButtonText: {
-    color: COLORS.text,
+    color: COLORS.background,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

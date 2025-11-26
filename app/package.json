@@ -12,6 +12,7 @@
     "@starknet-react/chains": "^5.0.3",
     "@starknet-react/core": "^5.0.3",
     "expo": "~54.0.25",
+    "expo-blur": "^15.0.7",
     "expo-linking": "^8.0.9",
     "expo-status-bar": "~3.0.8",
     "get-starknet-core": "^4.0.0",

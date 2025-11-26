@@ -21,6 +21,7 @@ import {
 import { COLORS, PROTOCOL } from '../constants';
 import { useStore } from '../store';
 import { usePosition, useStarknetWallet } from '../hooks';
+import { GlassCard } from '../components';
 import { formatWBTC, formatBTCUSD, parseWBTC } from '../services/starknet';
 
 interface Props {
