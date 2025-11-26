@@ -153,13 +153,13 @@ class XverseWalletService {
             address: paymentAccount.address,
             publicKey: paymentAccount.publicKey,
             purpose: AddressPurpose.Payment,
-            addressType: paymentAccount.addressType,
+            addressType: paymentAccount.addressType as 'p2wpkh' | 'p2tr' | 'p2sh' | 'p2pkh' | undefined,
           } : undefined,
           btcOrdinalsAddress: ordinalsAccount ? {
             address: ordinalsAccount.address,
             publicKey: ordinalsAccount.publicKey,
             purpose: AddressPurpose.Ordinals,
-            addressType: ordinalsAccount.addressType,
+            addressType: ordinalsAccount.addressType as 'p2wpkh' | 'p2tr' | 'p2sh' | 'p2pkh' | undefined,
           } : undefined,
           starknetAddress: starknetAccount ? {
             address: starknetAccount.address,
@@ -184,8 +184,16 @@ class XverseWalletService {
   async disconnect(): Promise<void> {
     const satsConnect = await this.loadSatsConnect();
 
-    if (satsConnect?.Wallet?.disconnect) {
-      await satsConnect.Wallet.disconnect();
+    if (satsConnect) {
+      // Try to disconnect if the method exists
+      try {
+        const walletModule = (satsConnect as any).Wallet;
+        if (walletModule?.disconnect) {
+          await walletModule.disconnect();
+        }
+      } catch {
+        // Ignore disconnect errors
+      }
     }
 
     this.connection = { isConnected: false };
@@ -221,8 +229,7 @@ class XverseWalletService {
             amount: params.amountSats,
           },
         ],
-        message: params.message || 'BTCUSD Protocol - Bridge to wBTC',
-      });
+      } as any);
 
       if (response.status === 'success' && response.result?.txid) {
         return { txId: response.result.txid };
