@@ -76,3 +76,45 @@ export const COLORS = {
   // Border
   border: 'rgba(255, 255, 255, 0.12)',
 } as const;
+
+// Typography
+export const FONTS = {
+  regular: 'HelveticaNeue',
+  medium: 'HelveticaNeue-Medium',
+  semibold: 'HelveticaNeue-Medium', // Helvetica doesn't have semibold
+  bold: 'HelveticaNeue-Bold',
+} as const;
+
+// Bridge configuration
+export const BRIDGE = {
+  // Backend API URL (update for production)
+  API_URL: process.env.EXPO_PUBLIC_BRIDGE_API_URL || 'http://localhost:3001/api/bridge',
+
+  // Bitcoin network
+  BITCOIN_NETWORK: 'testnet' as const, // 'mainnet' | 'testnet'
+
+  // Confirmation requirements
+  REQUIRED_CONFIRMATIONS: 3,
+
+  // Deposit settings
+  DEPOSIT_EXPIRY_HOURS: 24,
+  MIN_DEPOSIT_SATS: 10000, // 0.0001 BTC
+  MAX_DEPOSIT_SATS: 100000000, // 1 BTC
+
+  // Polling intervals (ms)
+  STATUS_POLL_INTERVAL: 30000, // 30 seconds
+
+  // Estimated times (seconds)
+  ESTIMATED_CONFIRMATION_TIME: 1800, // 30 minutes for 3 confirmations
+
+  // Fee settings (basis points)
+  BRIDGE_FEE_BPS: 50, // 0.5% fee
+} as const;
+
+// Mempool.space API for Bitcoin block explorer
+export const BITCOIN_EXPLORER = {
+  MAINNET: 'https://mempool.space',
+  TESTNET: 'https://mempool.space/testnet',
+  API_MAINNET: 'https://mempool.space/api',
+  API_TESTNET: 'https://mempool.space/testnet/api',
+} as const;

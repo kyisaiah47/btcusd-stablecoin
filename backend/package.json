@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "keeper:liquidation": "tsx src/keepers/liquidation-bot.ts",
     "keeper:yield": "tsx src/keepers/yield-harvester.ts",
-    "keeper:price": "tsx src/keepers/price-monitor.ts"
+    "keeper:price": "tsx src/keepers/price-monitor.ts",
+    "bridge": "BRIDGE_ENABLED=true tsx src/bridge-server.ts",
+    "bridge:dev": "BRIDGE_ENABLED=true tsx watch src/bridge-server.ts"
   },
   "dependencies": {
     "starknet": "^6.11.0",

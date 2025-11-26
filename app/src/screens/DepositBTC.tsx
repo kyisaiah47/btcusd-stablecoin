@@ -5,13 +5,13 @@
  *
  * Flow:
  * 1. User connects Xverse wallet
- * 2. App generates deposit address via Atomiq
+ * 2. App generates deposit address via backend API
  * 3. User sends BTC from Xverse
  * 4. Backend monitors for confirmations
  * 5. wBTC is minted to user's Starknet address
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,10 +21,14 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Clipboard,
+  Linking,
 } from 'react-native';
-import { COLORS, PROTOCOL } from '../constants';
+import { COLORS, BRIDGE } from '../constants';
 import { useStore } from '../store';
-import { xverseWallet, XverseWalletService } from '../services/xverse';
+import { xverseWallet } from '../services/xverse';
+import { bridgeApi } from '../services/bridge-api';
+import { BridgeDepositStatus } from '../types';
 
 // Deposit status steps
 enum DepositStep {
@@ -39,31 +43,47 @@ enum DepositStep {
 interface DepositState {
   step: DepositStep;
   btcAddress: string | null;
+  depositAddress: string | null;
   starknetAddress: string | null;
   amountBtc: string;
   amountSats: bigint;
   depositId: string | null;
   btcTxHash: string | null;
   confirmations: number;
+  requiredConfirmations: number;
+  expiresAt: number | null;
   error: string | null;
 }
 
 export function DepositBTC() {
   const { wallet } = useStore();
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const [state, setState] = useState<DepositState>({
     step: DepositStep.ConnectWallet,
     btcAddress: null,
+    depositAddress: null,
     starknetAddress: wallet.address || null,
     amountBtc: '',
     amountSats: 0n,
     depositId: null,
     btcTxHash: null,
     confirmations: 0,
+    requiredConfirmations: BRIDGE.REQUIRED_CONFIRMATIONS,
+    expiresAt: null,
     error: null,
   });
 
   const [isLoading, setIsLoading] = useState(false);
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, []);
 
   // Connect Xverse wallet
   const handleConnectXverse = useCallback(async () => {
@@ -117,10 +137,20 @@ export function DepositBTC() {
     }));
   }, []);
 
-  // Generate deposit address
+  // Generate deposit address via backend API
   const handleGenerateAddress = useCallback(async () => {
     if (state.amountSats <= 0n) {
       Alert.alert('Invalid Amount', 'Please enter a valid BTC amount');
+      return;
+    }
+
+    if (Number(state.amountSats) < BRIDGE.MIN_DEPOSIT_SATS) {
+      Alert.alert('Amount Too Low', `Minimum deposit is ${BRIDGE.MIN_DEPOSIT_SATS} sats`);
+      return;
+    }
+
+    if (Number(state.amountSats) > BRIDGE.MAX_DEPOSIT_SATS) {
+      Alert.alert('Amount Too High', `Maximum deposit is ${BRIDGE.MAX_DEPOSIT_SATS} sats`);
       return;
     }
 
@@ -128,50 +158,23 @@ export function DepositBTC() {
     setState((prev) => ({ ...prev, error: null }));
 
     try {
-      // In production, this would call the backend API
-      // which calls the Atomiq adapter contract
-      // For now, we simulate the address generation
-      const mockDepositId = `dep_${Date.now()}`;
-      const mockBtcAddress = generateMockDepositAddress(
-        state.starknetAddress || '',
-        state.amountSats
-      );
+      // Call backend API to request deposit address
+      const response = await bridgeApi.requestDeposit({
+        starknetAddress: state.starknetAddress || '',
+        amountSats: Number(state.amountSats),
+      });
 
       setState((prev) => ({
         ...prev,
         step: DepositStep.WaitingForDeposit,
-        depositId: mockDepositId,
+        depositId: response.depositId,
+        depositAddress: response.btcAddress,
+        expiresAt: response.expiresAt,
       }));
 
-      // Show the deposit address
-      Alert.alert(
-        'Send BTC to this address',
-        `${mockBtcAddress}\n\nAmount: ${state.amountBtc} BTC\n\nThis address expires in 24 hours.`,
-        [
-          {
-            text: 'Copy Address',
-            onPress: () => {
-              // Copy to clipboard would go here
-              Alert.alert('Copied', 'Address copied to clipboard');
-            },
-          },
-          {
-            text: 'Open Xverse',
-            onPress: async () => {
-              try {
-                await xverseWallet.sendBtc({
-                  recipient: mockBtcAddress,
-                  amountSats: Number(state.amountSats),
-                  message: 'BTCUSD Protocol Deposit',
-                });
-              } catch (error) {
-                // Fallback to opening app
-                await xverseWallet.openXverseApp();
-              }
-            },
-          },
-        ]
-      );
+      // Start polling for deposit status
+      startPolling(response.depositId);
+
     } catch (error: any) {
       console.error('Generate address error:', error);
       setState((prev) => ({
@@ -181,50 +184,150 @@ export function DepositBTC() {
     } finally {
       setIsLoading(false);
     }
-  }, [state.amountSats, state.amountBtc, state.starknetAddress]);
+  }, [state.amountSats, state.starknetAddress]);
 
-  // Check deposit status
+  // Start polling for deposit status
+  const startPolling = useCallback((depositId: string) => {
+    // Clear any existing polling
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
+    pollingRef.current = setInterval(async () => {
+      try {
+        const deposit = await bridgeApi.getDepositStatus(depositId);
+
+        setState((prev) => ({
+          ...prev,
+          confirmations: deposit.confirmations,
+          btcTxHash: deposit.btcTxHash || null,
+          requiredConfirmations: deposit.requiredConfirmations,
+        }));
+
+        // Update step based on status
+        if (deposit.status === BridgeDepositStatus.Confirmed) {
+          setState((prev) => ({ ...prev, step: DepositStep.Confirming }));
+        }
+
+        if (deposit.status === BridgeDepositStatus.Claimed) {
+          // Deposit complete
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+          }
+          setState((prev) => ({ ...prev, step: DepositStep.Complete }));
+          Alert.alert(
+            'Deposit Complete!',
+            `${(deposit.amountSats / 100000000).toFixed(8)} wBTC has been minted to your Starknet address.`
+          );
+        }
+
+        if (deposit.status === BridgeDepositStatus.Expired) {
+          // Deposit expired
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+          }
+          setState((prev) => ({
+            ...prev,
+            error: 'Deposit expired. Please try again.',
+          }));
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+      }
+    }, BRIDGE.STATUS_POLL_INTERVAL);
+  }, []);
+
+  // Copy address to clipboard
+  const handleCopyAddress = useCallback(() => {
+    if (state.depositAddress) {
+      Clipboard.setString(state.depositAddress);
+      Alert.alert('Copied', 'Address copied to clipboard');
+    }
+  }, [state.depositAddress]);
+
+  // Open Xverse to send BTC
+  const handleOpenXverse = useCallback(async () => {
+    if (!state.depositAddress) return;
+
+    try {
+      await xverseWallet.sendBtc({
+        recipient: state.depositAddress,
+        amountSats: Number(state.amountSats),
+        message: 'BTCUSD Protocol Deposit',
+      });
+    } catch (error) {
+      // Fallback to opening app
+      await xverseWallet.openXverseApp();
+    }
+  }, [state.depositAddress, state.amountSats]);
+
+  // Open transaction in explorer
+  const handleViewTransaction = useCallback(() => {
+    if (state.btcTxHash) {
+      const explorerUrl = BRIDGE.BITCOIN_NETWORK === 'mainnet'
+        ? `https://mempool.space/tx/${state.btcTxHash}`
+        : `https://mempool.space/testnet/tx/${state.btcTxHash}`;
+      Linking.openURL(explorerUrl);
+    }
+  }, [state.btcTxHash]);
+
+  // Manual check deposit status
   const handleCheckStatus = useCallback(async () => {
+    if (!state.depositId) return;
+
     setIsLoading(true);
 
     try {
-      // In production, this would query the backend
-      // For demo, we simulate confirmation progress
-      const newConfirmations = state.confirmations + 1;
+      const deposit = await bridgeApi.getDepositStatus(state.depositId);
 
-      if (newConfirmations >= 3) {
-        setState((prev) => ({
-          ...prev,
-          step: DepositStep.Complete,
-          confirmations: newConfirmations,
-        }));
+      setState((prev) => ({
+        ...prev,
+        confirmations: deposit.confirmations,
+        btcTxHash: deposit.btcTxHash || null,
+      }));
+
+      if (deposit.status === BridgeDepositStatus.Claimed) {
+        if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+        }
+        setState((prev) => ({ ...prev, step: DepositStep.Complete }));
         Alert.alert(
           'Deposit Complete!',
-          `${state.amountBtc} wBTC has been minted to your Starknet address.`
+          `${(deposit.amountSats / 100000000).toFixed(8)} wBTC has been minted to your Starknet address.`
         );
-      } else {
-        setState((prev) => ({
-          ...prev,
-          step: DepositStep.Confirming,
-          confirmations: newConfirmations,
-        }));
+      } else if (deposit.confirmations > 0) {
+        setState((prev) => ({ ...prev, step: DepositStep.Confirming }));
       }
+    } catch (error: any) {
+      console.error('Check status error:', error);
+      setState((prev) => ({
+        ...prev,
+        error: error.message || 'Failed to check status',
+      }));
     } finally {
       setIsLoading(false);
     }
-  }, [state.confirmations, state.amountBtc]);
+  }, [state.depositId]);
 
   // Reset to start
   const handleReset = useCallback(() => {
+    // Clear polling
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+    }
+
     setState({
       step: DepositStep.ConnectWallet,
       btcAddress: null,
+      depositAddress: null,
       starknetAddress: wallet.address || null,
       amountBtc: '',
       amountSats: 0n,
       depositId: null,
       btcTxHash: null,
       confirmations: 0,
+      requiredConfirmations: BRIDGE.REQUIRED_CONFIRMATIONS,
+      expiresAt: null,
       error: null,
     });
   }, [wallet.address]);
@@ -314,9 +417,33 @@ export function DepositBTC() {
             </Text>
             <Text style={styles.stepDescription}>
               {state.step === DepositStep.WaitingForDeposit
-                ? 'Send BTC to the deposit address shown above.'
-                : `Waiting for Bitcoin confirmations (${state.confirmations}/3)`}
+                ? 'Send BTC to the deposit address below.'
+                : `Waiting for Bitcoin confirmations (${state.confirmations}/${state.requiredConfirmations})`}
             </Text>
+
+            {/* Deposit Address */}
+            {state.depositAddress && (
+              <View style={styles.addressCard}>
+                <Text style={styles.addressCardLabel}>Send BTC to:</Text>
+                <Text style={styles.addressCardValue} selectable>
+                  {state.depositAddress}
+                </Text>
+                <View style={styles.addressActions}>
+                  <TouchableOpacity
+                    style={styles.addressActionButton}
+                    onPress={handleCopyAddress}
+                  >
+                    <Text style={styles.addressActionText}>Copy</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.addressActionButton, styles.addressActionPrimary]}
+                    onPress={handleOpenXverse}
+                  >
+                    <Text style={styles.addressActionTextPrimary}>Send with Xverse</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
 
             <View style={styles.statusCard}>
               <View style={styles.statusRow}>
@@ -325,19 +452,39 @@ export function DepositBTC() {
               </View>
               <View style={styles.statusRow}>
                 <Text style={styles.statusLabel}>Deposit ID:</Text>
-                <Text style={styles.statusValue}>{state.depositId}</Text>
+                <Text style={styles.statusValue}>{state.depositId?.slice(0, 12)}...</Text>
               </View>
               <View style={styles.statusRow}>
                 <Text style={styles.statusLabel}>Confirmations:</Text>
-                <Text style={styles.statusValue}>{state.confirmations}/3</Text>
+                <Text style={styles.statusValue}>
+                  {state.confirmations}/{state.requiredConfirmations}
+                </Text>
               </View>
+              {state.btcTxHash && (
+                <TouchableOpacity onPress={handleViewTransaction}>
+                  <View style={styles.statusRow}>
+                    <Text style={styles.statusLabel}>Transaction:</Text>
+                    <Text style={[styles.statusValue, styles.linkText]}>
+                      {state.btcTxHash.slice(0, 12)}... (View)
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              {state.expiresAt && (
+                <View style={styles.statusRow}>
+                  <Text style={styles.statusLabel}>Expires:</Text>
+                  <Text style={styles.statusValue}>
+                    {new Date(state.expiresAt * 1000).toLocaleString()}
+                  </Text>
+                </View>
+              )}
             </View>
 
             <View style={styles.progressBar}>
               <View
                 style={[
                   styles.progressFill,
-                  { width: `${(state.confirmations / 3) * 100}%` },
+                  { width: `${(state.confirmations / state.requiredConfirmations) * 100}%` },
                 ]}
               />
             </View>
@@ -350,7 +497,7 @@ export function DepositBTC() {
               {isLoading ? (
                 <ActivityIndicator color={COLORS.primary} />
               ) : (
-                <Text style={styles.secondaryButtonText}>Check Status</Text>
+                <Text style={styles.secondaryButtonText}>Refresh Status</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -431,19 +578,6 @@ export function DepositBTC() {
       </ScrollView>
     </View>
   );
-}
-
-// Helper: Generate mock deposit address
-function generateMockDepositAddress(starknetAddress: string, amount: bigint): string {
-  // This is a placeholder - real address comes from Atomiq
-  const hash = Math.abs(
-    starknetAddress.split('').reduce((a, b) => {
-      return a + b.charCodeAt(0);
-    }, 0) + Number(amount % 1000000n)
-  )
-    .toString(16)
-    .slice(0, 32);
-  return `tb1q${hash}`;
 }
 
 const styles = StyleSheet.create({
@@ -670,5 +804,55 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     fontSize: 13,
     lineHeight: 20,
+  },
+  addressCard: {
+    backgroundColor: COLORS.surfaceLight,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.primary,
+  },
+  addressCardLabel: {
+    color: COLORS.textSecondary,
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  addressCardValue: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontFamily: 'monospace',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  addressActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  addressActionButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    alignItems: 'center',
+  },
+  addressActionPrimary: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  addressActionText: {
+    color: COLORS.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  addressActionTextPrimary: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  linkText: {
+    color: COLORS.primary,
+    textDecorationLine: 'underline',
   },
 });

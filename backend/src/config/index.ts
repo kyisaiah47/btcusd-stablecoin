@@ -85,3 +85,37 @@ export const PRICE_CONFIG: PriceKeeperConfig = {
 // ============ Logging ============
 
 export const LOG_LEVEL = process.env.LOG_LEVEL || 'info';
+
+// ============ Bridge Config ============
+
+export const BRIDGE_CONFIG = {
+  enabled: process.env.BRIDGE_ENABLED === 'true',
+  atomiqAdapterAddress: process.env.ATOMIQ_ADAPTER_ADDRESS || '0x0',
+
+  // Bitcoin network
+  bitcoinNetwork: (process.env.BITCOIN_NETWORK || 'testnet') as 'mainnet' | 'testnet',
+
+  // Mempool.space API for Bitcoin monitoring
+  mempoolApiUrl: process.env.MEMPOOL_API_URL ||
+    (process.env.BITCOIN_NETWORK === 'mainnet'
+      ? 'https://mempool.space/api'
+      : 'https://mempool.space/testnet/api'),
+
+  // Confirmation requirements
+  requiredConfirmations: parseInt(process.env.BRIDGE_CONFIRMATIONS || '3'),
+
+  // Polling interval (ms)
+  pollIntervalMs: parseInt(process.env.BRIDGE_POLL_INTERVAL || '30000'),
+
+  // Deposit settings
+  depositExpirySeconds: parseInt(process.env.DEPOSIT_EXPIRY_SECONDS || '86400'), // 24 hours
+  minDepositSats: parseInt(process.env.MIN_DEPOSIT_SATS || '10000'), // 0.0001 BTC
+  maxDepositSats: parseInt(process.env.MAX_DEPOSIT_SATS || '100000000'), // 1 BTC
+
+  // API server
+  apiPort: parseInt(process.env.BRIDGE_API_PORT || '3001'),
+  apiHost: process.env.BRIDGE_API_HOST || '0.0.0.0',
+
+  // CORS origins
+  corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:8081', 'http://localhost:19006'],
+} as const;

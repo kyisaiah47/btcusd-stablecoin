@@ -487,14 +487,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   withdrawBtn: {
-    backgroundColor: COLORS.warning,
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: COLORS.secondary,
+    borderRadius: 16,
+    paddingVertical: 18,
     alignItems: 'center',
     marginBottom: 24,
   },
   withdrawBtnDisabled: {
     backgroundColor: COLORS.surfaceLight,
+    opacity: 0.5,
   },
   withdrawBtnText: {
     color: COLORS.background,

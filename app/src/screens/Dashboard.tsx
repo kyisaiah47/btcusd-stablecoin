@@ -14,6 +14,7 @@ import {
   Modal,
   ActivityIndicator,
   Linking,
+  Image,
 } from 'react-native';
 import { COLORS } from '../constants';
 import { useStore } from '../store';
@@ -160,7 +161,11 @@ export function Dashboard() {
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.logo}>BTCUSD</Text>
+          <Image
+            source={require('../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.subtitle}>Bitcoin-Backed Stablecoin</Text>
         </View>
         <TouchableOpacity
@@ -361,15 +366,14 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   logo: {
-    color: COLORS.primary,
-    fontSize: 32,
-    fontWeight: '800',
-    letterSpacing: -1,
+    width: 150,
+    height: 38,
   },
   subtitle: {
     color: COLORS.textSecondary,
     fontSize: 12,
-    marginTop: 2,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   connectButton: {
     backgroundColor: COLORS.surface,

@@ -10,14 +10,28 @@
  * 4. Process wBTC → BTC withdrawal requests
  */
 
-import { Contract, Call } from 'starknet';
+import { Contract, Call, hash } from 'starknet';
 import { getProvider, getKeeperAccount, executeTransaction } from './starknet.js';
-import { CONTRACTS } from '../config/index.js';
+import { CONTRACTS, BRIDGE_CONFIG } from '../config/index.js';
+import { getBitcoinMonitor, type DepositInfo } from './bitcoin-monitor.js';
+import * as db from './database.js';
 import pino from 'pino';
+
+// Export types from database module for external consumers
+// Note: consumers should import directly from database.js
+export type { BridgeDeposit, BridgeWithdrawal } from './database.js';
+
+// Local type aliases
+type BridgeDeposit = db.BridgeDeposit;
+type BridgeWithdrawal = db.BridgeWithdrawal;
 
 // @ts-ignore - pino ESM typing issue
 const createLogger = pino.default || pino;
 const logger = createLogger({ name: 'atomiq-bridge' });
+
+// Export enum values as constants for convenience
+export const BridgeDepositStatus = db.BridgeDepositStatus;
+export const BridgeWithdrawalStatus = db.BridgeWithdrawalStatus;
 
 // Bridge configuration
 export interface AtomiqBridgeConfig {
@@ -65,10 +79,11 @@ export interface BridgeDepositStatus {
   depositId: string;
   user: string;
   amountSats: bigint;
+  btcAddress: string;
   btcAddressHash: string;
   status: DepositStatus;
   btcTxHash?: string;
-  confirmations?: number;
+  confirmations: number;
   createdAt: number;
   expiresAt: number;
 }
@@ -138,32 +153,45 @@ const ATOMIQ_ADAPTER_ABI = [
 export class AtomiqBridgeService {
   private config: AtomiqBridgeConfig;
   private atomiqAdapter: Contract | null = null;
-  private pendingDeposits: Map<string, BridgeDepositStatus> = new Map();
   private monitoringInterval: NodeJS.Timeout | null = null;
+  private dbInitialized: boolean = false;
 
   constructor(config: AtomiqBridgeConfig) {
     this.config = config;
   }
 
   /**
+   * Initialize database
+   */
+  private initDb(): void {
+    if (!this.dbInitialized) {
+      db.initDatabase();
+      this.dbInitialized = true;
+      logger.info('Database initialized for bridge service');
+    }
+  }
+
+  /**
    * Initialize the bridge service
    */
   async initialize(): Promise<void> {
+    // Initialize database first
+    this.initDb();
+
     const atomiqAdapterAddress = process.env.ATOMIQ_ADAPTER_ADDRESS;
     if (!atomiqAdapterAddress) {
-      logger.warn('ATOMIQ_ADAPTER_ADDRESS not set, bridge service disabled');
-      return;
+      logger.warn('ATOMIQ_ADAPTER_ADDRESS not set, bridge will operate in API-only mode');
+    } else {
+      const account = getKeeperAccount();
+      this.atomiqAdapter = new Contract(
+        ATOMIQ_ADAPTER_ABI as any,
+        atomiqAdapterAddress,
+        account
+      );
+      logger.info(`Atomiq Adapter: ${atomiqAdapterAddress}`);
     }
 
-    const account = getKeeperAccount();
-    this.atomiqAdapter = new Contract(
-      ATOMIQ_ADAPTER_ABI as any,
-      atomiqAdapterAddress,
-      account
-    );
-
-    logger.info(`Atomiq Bridge Service initialized`);
-    logger.info(`Atomiq Adapter: ${atomiqAdapterAddress}`);
+    logger.info('Atomiq Bridge Service initialized');
   }
 
   /**
@@ -208,53 +236,65 @@ export class AtomiqBridgeService {
    * Request a new deposit address for a user
    */
   async requestDeposit(request: BridgeDepositRequest): Promise<BridgeDepositResponse> {
-    if (!this.atomiqAdapter) {
-      throw new Error('Atomiq adapter not initialized');
+    this.initDb();
+
+    // Validate amount
+    const amountSats = Number(request.amountSats);
+    if (amountSats < BRIDGE_CONFIG.minDepositSats) {
+      throw new Error(`Minimum deposit is ${BRIDGE_CONFIG.minDepositSats} sats`);
+    }
+    if (amountSats > BRIDGE_CONFIG.maxDepositSats) {
+      throw new Error(`Maximum deposit is ${BRIDGE_CONFIG.maxDepositSats} sats`);
     }
 
     logger.info({
       user: request.starknetAddress,
-      amountSats: request.amountSats.toString(),
+      amountSats: amountSats.toString(),
     }, 'Requesting deposit address');
 
     try {
-      // Call the contract to create deposit request
-      // Note: In production, this would be called by the user's wallet
-      // The backend would then monitor for the BTC deposit
+      // Generate unique deposit ID
+      const depositId = `dep_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-      // For now, we simulate generating a deposit address
-      // In production, this would come from Atomiq's actual service
-      const depositId = BigInt(Date.now());
+      // Generate BTC address hash (deterministic from user + deposit ID)
       const btcAddressHash = this.generateBtcAddressHash(
         request.starknetAddress,
-        depositId
+        BigInt(Date.now())
       );
 
-      // Generate a testnet BTC address (simplified)
-      const btcAddress = this.hashToBtcAddress(btcAddressHash);
+      // Generate the actual BTC deposit address
+      // In production with real Atomiq integration, this would come from Atomiq's service
+      // For now, we generate a deterministic testnet address
+      const btcAddress = this.generateDepositAddress(request.starknetAddress, BigInt(Date.now()));
 
-      const expiresAt = Math.floor(Date.now() / 1000) + 86400; // 24 hours
+      const now = Math.floor(Date.now() / 1000);
+      const expiresAt = now + BRIDGE_CONFIG.depositExpirySeconds;
 
-      const deposit: BridgeDepositStatus = {
-        depositId: depositId.toString(),
-        user: request.starknetAddress,
-        amountSats: request.amountSats,
-        btcAddressHash,
-        status: DepositStatus.Pending,
-        createdAt: Math.floor(Date.now() / 1000),
+      // Create deposit record for database
+      const deposit: BridgeDeposit = {
+        id: depositId,
+        starknetAddress: request.starknetAddress,
+        btcAddress,
+        amountSats,
+        status: BridgeDepositStatus.Pending,
+        confirmations: 0,
+        requiredConfirmations: this.config.requiredConfirmations,
+        createdAt: now,
+        updatedAt: now,
         expiresAt,
       };
 
-      this.pendingDeposits.set(depositId.toString(), deposit);
+      // Save to database
+      db.saveDeposit(deposit);
 
       logger.info({
-        depositId: depositId.toString(),
+        depositId,
         btcAddress,
         expiresAt,
-      }, 'Deposit address generated');
+      }, 'Deposit address generated and saved');
 
       return {
-        depositId: depositId.toString(),
+        depositId,
         btcAddress,
         btcAddressHash,
         amountSats: request.amountSats,
@@ -274,36 +314,50 @@ export class AtomiqBridgeService {
 
     const now = Math.floor(Date.now() / 1000);
 
-    for (const [depositId, deposit] of this.pendingDeposits) {
-      // Check if expired
-      if (now > deposit.expiresAt) {
-        deposit.status = DepositStatus.Expired;
-        logger.info({ depositId }, 'Deposit expired');
-        continue;
-      }
+    // Get pending deposits from database
+    const pendingDeposits = db.getPendingDeposits();
 
-      // Check for BTC transaction
-      if (deposit.status === DepositStatus.Pending) {
-        const btcTx = await this.checkBtcDeposit(deposit.btcAddressHash);
+    // Check for expired deposits
+    const expiredDeposits = db.getExpiredDeposits();
+    for (const deposit of expiredDeposits) {
+      deposit.status = BridgeDepositStatus.Expired;
+      deposit.updatedAt = now;
+      db.updateDeposit(deposit);
+      logger.info({ depositId: deposit.id }, 'Deposit expired');
+    }
+
+    // Process each pending deposit
+    for (const deposit of pendingDeposits) {
+      // Check for BTC transaction using the actual BTC address
+      if (deposit.status === BridgeDepositStatus.Pending || deposit.status === BridgeDepositStatus.Detected) {
+        const btcTx = await this.checkBtcDeposit(deposit.btcAddress, BigInt(deposit.amountSats));
 
         if (btcTx) {
           deposit.btcTxHash = btcTx.txHash;
           deposit.confirmations = btcTx.confirmations;
+          deposit.updatedAt = now;
 
           if (btcTx.confirmations >= this.config.requiredConfirmations) {
-            deposit.status = DepositStatus.Confirmed;
+            deposit.status = BridgeDepositStatus.Confirmed;
             logger.info({
-              depositId,
+              depositId: deposit.id,
               txHash: btcTx.txHash,
               confirmations: btcTx.confirmations,
+              amountSats: btcTx.amountSats.toString(),
             }, 'Deposit confirmed');
-          } else {
+          } else if (btcTx.confirmations > 0) {
+            deposit.status = BridgeDepositStatus.Confirming;
             logger.debug({
-              depositId,
+              depositId: deposit.id,
               confirmations: btcTx.confirmations,
               required: this.config.requiredConfirmations,
             }, 'Waiting for confirmations');
+          } else {
+            deposit.status = BridgeDepositStatus.Detected;
           }
+
+          // Update in database
+          db.updateDeposit(deposit);
         }
       }
     }
@@ -313,12 +367,20 @@ export class AtomiqBridgeService {
    * Process confirmed deposits by triggering wBTC minting
    */
   private async processConfirmedDeposits(): Promise<void> {
-    for (const [depositId, deposit] of this.pendingDeposits) {
-      if (deposit.status === DepositStatus.Confirmed && deposit.btcTxHash) {
+    // Get confirmed deposits from database
+    const pendingDeposits = db.getPendingDeposits();
+
+    for (const deposit of pendingDeposits) {
+      if (deposit.status === BridgeDepositStatus.Confirmed && deposit.btcTxHash) {
         try {
-          await this.claimDeposit(depositId, deposit);
+          await this.claimDeposit(deposit);
         } catch (error) {
-          logger.error({ error, depositId }, 'Failed to claim deposit');
+          logger.error({ error, depositId: deposit.id }, 'Failed to claim deposit');
+          // Mark as failed in database
+          deposit.status = BridgeDepositStatus.Failed;
+          deposit.error = error instanceof Error ? error.message : 'Unknown error';
+          deposit.updatedAt = Math.floor(Date.now() / 1000);
+          db.updateDeposit(deposit);
         }
       }
     }
@@ -327,65 +389,93 @@ export class AtomiqBridgeService {
   /**
    * Claim a confirmed deposit to mint wBTC
    */
-  private async claimDeposit(
-    depositId: string,
-    deposit: BridgeDepositStatus
-  ): Promise<void> {
-    if (!this.atomiqAdapter || !deposit.btcTxHash) {
+  private async claimDeposit(deposit: BridgeDeposit): Promise<void> {
+    if (!deposit.btcTxHash) {
       return;
     }
 
-    logger.info({ depositId, btcTxHash: deposit.btcTxHash }, 'Claiming deposit');
+    logger.info({ depositId: deposit.id, btcTxHash: deposit.btcTxHash }, 'Claiming deposit');
 
     try {
-      // Convert BTC tx hash to u256
-      const btcTxHashU256 = BigInt('0x' + deposit.btcTxHash);
+      let starknetTxHash: string | undefined;
 
-      // In production, get the actual merkle proof from Atomiq's BTC relay
-      // For now, we use an empty proof (testing mode)
-      const merkleProof: bigint[] = [];
+      // Only try to execute on-chain if adapter is configured
+      if (this.atomiqAdapter) {
+        // Convert BTC tx hash to u256
+        const btcTxHashU256 = BigInt('0x' + deposit.btcTxHash);
 
-      const calls: Call[] = [
-        {
-          contractAddress: this.atomiqAdapter.address,
-          entrypoint: 'claim_deposit',
-          calldata: [
-            depositId,
-            btcTxHashU256.toString(),
-            merkleProof.length.toString(),
-            ...merkleProof.map((p) => p.toString()),
-          ],
-        },
-      ];
+        // In production, get the actual merkle proof from Atomiq's BTC relay
+        // For now, we use an empty proof (testing mode)
+        const merkleProof: bigint[] = [];
 
-      const txHash = await executeTransaction(calls);
+        const calls: Call[] = [
+          {
+            contractAddress: this.atomiqAdapter.address,
+            entrypoint: 'claim_deposit',
+            calldata: [
+              deposit.id,
+              btcTxHashU256.toString(),
+              merkleProof.length.toString(),
+              ...merkleProof.map((p) => p.toString()),
+            ],
+          },
+        ];
 
-      deposit.status = DepositStatus.Claimed;
-      logger.info({ depositId, txHash }, 'Deposit claimed successfully');
+        starknetTxHash = await executeTransaction(calls);
+        logger.info({ depositId: deposit.id, starknetTxHash }, 'On-chain claim executed');
+      } else {
+        logger.warn({ depositId: deposit.id }, 'No Atomiq adapter configured, marking as claimed without on-chain tx');
+      }
 
-      // Remove from pending
-      this.pendingDeposits.delete(depositId);
+      // Update deposit in database
+      const now = Math.floor(Date.now() / 1000);
+      deposit.status = BridgeDepositStatus.Claimed;
+      deposit.starknetTxHash = starknetTxHash;
+      deposit.claimedAt = now;
+      deposit.updatedAt = now;
+      db.updateDeposit(deposit);
+
+      // Update statistics
+      db.updateBridgeStats(1, 0, deposit.amountSats);
+
+      logger.info({ depositId: deposit.id, starknetTxHash }, 'Deposit claimed successfully');
     } catch (error) {
-      logger.error({ error, depositId }, 'Failed to claim deposit');
+      logger.error({ error, depositId: deposit.id }, 'Failed to claim deposit');
       throw error;
     }
   }
 
   /**
    * Check Bitcoin blockchain for deposit to address
-   * In production, this would query a Bitcoin node or Atomiq's API
+   * Uses Mempool.space API for real Bitcoin monitoring
    */
   private async checkBtcDeposit(
-    btcAddressHash: string
+    btcAddress: string,
+    expectedAmountSats?: bigint
   ): Promise<BtcTransaction | null> {
-    // In production, this would:
-    // 1. Query Atomiq API for deposits to the address
-    // 2. Or query a Bitcoin node/indexer directly
-    // 3. Return transaction details if found
+    try {
+      const bitcoinMonitor = getBitcoinMonitor();
+      const depositInfo = await bitcoinMonitor.checkForDeposit(
+        btcAddress,
+        expectedAmountSats ? Number(expectedAmountSats) : undefined
+      );
 
-    // For testing, we simulate no transaction found
-    // Users would need to actually send BTC to trigger the bridge
-    return null;
+      if (!depositInfo) {
+        return null;
+      }
+
+      return {
+        txHash: depositInfo.txid,
+        outputIndex: 0, // We don't track specific output index
+        address: btcAddress,
+        amountSats: BigInt(depositInfo.amountSats),
+        confirmations: depositInfo.confirmations,
+        blockHeight: depositInfo.blockHeight,
+      };
+    } catch (error) {
+      logger.error({ error, btcAddress }, 'Failed to check BTC deposit');
+      return null;
+    }
   }
 
   /**
@@ -407,33 +497,67 @@ export class AtomiqBridgeService {
   }
 
   /**
-   * Convert hash to testnet BTC address (simplified)
+   * Generate a deposit address for a user
+   * In production, this would come from Atomiq's HD wallet derivation
+   * For testnet demo, we generate deterministic addresses
+   */
+  private generateDepositAddress(starknetAddress: string, depositId: bigint): string {
+    // Create a deterministic hash from the user address and deposit ID
+    const combined = `${starknetAddress}:${depositId.toString()}`;
+    const hashBytes = this.simpleHash(combined);
+
+    // For testnet, generate a tb1q (native segwit) style address
+    // This is a simplified version - real implementation would use proper HD derivation
+    const addressData = hashBytes.slice(0, 20).toString('hex');
+
+    if (BRIDGE_CONFIG.bitcoinNetwork === 'mainnet') {
+      return `bc1q${addressData}`;
+    } else {
+      return `tb1q${addressData}`;
+    }
+  }
+
+  /**
+   * Simple hash function for address generation
+   * In production, use proper cryptographic derivation
+   */
+  private simpleHash(input: string): Buffer {
+    let hash = 0n;
+    for (let i = 0; i < input.length; i++) {
+      const char = BigInt(input.charCodeAt(i));
+      hash = ((hash << 5n) - hash + char) & 0xffffffffffffffffn;
+    }
+
+    // Convert to bytes and pad to 32 bytes
+    const hexStr = hash.toString(16).padStart(64, '0');
+    return Buffer.from(hexStr, 'hex');
+  }
+
+  /**
+   * Convert hash to BTC address (legacy method for compatibility)
    */
   private hashToBtcAddress(hash: string): string {
-    // This is a placeholder - in production, Atomiq would provide
-    // the actual BTC deposit address
-    const shortHash = hash.slice(2, 34);
+    const shortHash = hash.slice(2, 42);
+    if (BRIDGE_CONFIG.bitcoinNetwork === 'mainnet') {
+      return `bc1q${shortHash}`;
+    }
     return `tb1q${shortHash}`; // Testnet bech32 format
   }
 
   /**
    * Get deposit status by ID
    */
-  async getDepositStatus(depositId: string): Promise<BridgeDepositStatus | null> {
-    return this.pendingDeposits.get(depositId) || null;
+  async getDepositStatus(depositId: string): Promise<BridgeDeposit | null> {
+    this.initDb();
+    return db.getDeposit(depositId);
   }
 
   /**
-   * Get all pending deposits for a user
+   * Get all deposits for a user
    */
-  async getUserDeposits(starknetAddress: string): Promise<BridgeDepositStatus[]> {
-    const deposits: BridgeDepositStatus[] = [];
-    for (const deposit of this.pendingDeposits.values()) {
-      if (deposit.user === starknetAddress) {
-        deposits.push(deposit);
-      }
-    }
-    return deposits;
+  async getUserDeposits(starknetAddress: string): Promise<BridgeDeposit[]> {
+    this.initDb();
+    return db.getDepositsByStarknetAddress(starknetAddress);
   }
 
   /**
@@ -442,26 +566,42 @@ export class AtomiqBridgeService {
   getStats(): {
     pendingDeposits: number;
     confirmedDeposits: number;
-    totalValuePending: bigint;
+    totalValuePending: number;
+    totalDeposits: number;
+    totalWithdrawals: number;
+    totalVolumeSats: number;
   } {
-    let pendingCount = 0;
-    let confirmedCount = 0;
-    let totalValue = 0n;
+    this.initDb();
 
-    for (const deposit of this.pendingDeposits.values()) {
-      if (deposit.status === DepositStatus.Pending) {
-        pendingCount++;
-        totalValue += deposit.amountSats;
-      } else if (deposit.status === DepositStatus.Confirmed) {
-        confirmedCount++;
-      }
+    const statusCounts = db.getDepositCountsByStatus();
+    const stats = db.getBridgeStats();
+
+    const pendingCount = (statusCounts['pending'] || 0) + (statusCounts['detected'] || 0) + (statusCounts['confirming'] || 0);
+    const confirmedCount = statusCounts['confirmed'] || 0;
+
+    // Calculate total pending value
+    const pendingDeposits = db.getPendingDeposits();
+    let totalPendingValue = 0;
+    for (const deposit of pendingDeposits) {
+      totalPendingValue += deposit.amountSats;
     }
 
     return {
       pendingDeposits: pendingCount,
       confirmedDeposits: confirmedCount,
-      totalValuePending: totalValue,
+      totalValuePending: totalPendingValue,
+      totalDeposits: stats.totalDeposits,
+      totalWithdrawals: stats.totalWithdrawals,
+      totalVolumeSats: stats.totalVolumeSats,
     };
+  }
+
+  /**
+   * Get recent deposits
+   */
+  getRecentDeposits(limit: number = 10): BridgeDeposit[] {
+    this.initDb();
+    return db.getRecentDeposits(limit);
   }
 }
 

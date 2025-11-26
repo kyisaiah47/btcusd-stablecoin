@@ -498,17 +498,18 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   depositBtn: {
-    backgroundColor: COLORS.success,
-    borderRadius: 12,
-    paddingVertical: 16,
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    paddingVertical: 18,
     alignItems: 'center',
     marginBottom: 24,
   },
   depositBtnDisabled: {
     backgroundColor: COLORS.surfaceLight,
+    opacity: 0.5,
   },
   depositBtnText: {
-    color: COLORS.text,
+    color: COLORS.background,
     fontSize: 18,
     fontWeight: '700',
   },

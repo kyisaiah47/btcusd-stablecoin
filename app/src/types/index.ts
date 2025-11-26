@@ -48,3 +48,80 @@ export interface ProtocolStats {
   btcPrice: bigint;
   utilizationRate: number;
 }
+
+// ============ Bridge Types ============
+
+export enum BridgeDepositStatus {
+  Pending = 0,
+  Confirmed = 1,
+  Claimed = 2,
+  Expired = 3,
+}
+
+export enum BridgeWithdrawalStatus {
+  Pending = 0,
+  Processing = 1,
+  Completed = 2,
+  Refunded = 3,
+}
+
+export interface BridgeDepositRequest {
+  starknetAddress: string;
+  amountSats: number;
+}
+
+export interface BridgeDepositResponse {
+  depositId: string;
+  btcAddress: string;
+  btcAddressHash: string;
+  amountSats: number;
+  expiresAt: number;
+}
+
+export interface BridgeDeposit {
+  depositId: string;
+  user: string;
+  amountSats: number;
+  btcAddress: string;
+  btcAddressHash: string;
+  status: BridgeDepositStatus;
+  btcTxHash?: string;
+  confirmations: number;
+  requiredConfirmations: number;
+  createdAt: number;
+  expiresAt: number;
+  claimedAt?: number;
+  wbtcAmount?: bigint;
+}
+
+export interface BridgeWithdrawalRequest {
+  starknetAddress: string;
+  amountSats: number;
+  btcAddress: string;
+}
+
+export interface BridgeWithdrawalResponse {
+  withdrawalId: string;
+  amountSats: number;
+  btcAddress: string;
+  estimatedTime: number;
+}
+
+export interface BridgeWithdrawal {
+  withdrawalId: string;
+  user: string;
+  amountSats: number;
+  btcAddress: string;
+  status: BridgeWithdrawalStatus;
+  btcTxHash?: string;
+  createdAt: number;
+  completedAt?: number;
+}
+
+export interface BridgeStats {
+  pendingDeposits: number;
+  confirmedDeposits: number;
+  totalValuePendingSats: number;
+  pendingWithdrawals: number;
+  processingWithdrawals: number;
+}
