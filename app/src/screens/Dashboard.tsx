@@ -25,18 +25,20 @@ export function Dashboard() {
   };
 
   const handleConnect = () => {
-    // Demo: simulate wallet connection
+    // Demo: simulate wallet connection with deployer address
     setWallet({
-      address: '0x123...abc',
+      address: '0x1f7bb20a9a9f073da23ab3319ec81e81289982b9afd1115269003a6c5f20acf',
       isConnected: true,
       chainId: 'SN_SEPOLIA',
     });
+    // Refresh position after connecting
+    setTimeout(() => refreshAll(), 500);
   };
 
   const handleAction = (actionId: string) => {
     Alert.alert(
       `${actionId.charAt(0).toUpperCase() + actionId.slice(1)}`,
-      'This feature will be available once contracts are deployed to testnet.',
+      `Contracts deployed! Visit Starkscan to interact:\nhttps://sepolia.starkscan.co/contract/0x07680fff5f34fee2e90912bce4a33870cde11c0bf3706737a94e947e274e58d4`,
       [{ text: 'OK' }]
     );
   };
@@ -44,7 +46,7 @@ export function Dashboard() {
   const handleHarvest = () => {
     Alert.alert(
       'Harvest Yield',
-      'This feature will be available once contracts are deployed to testnet.',
+      'Yield harvesting is available via contract interaction. Visit Starkscan to call harvest_user_yield on the YieldManager.',
       [{ text: 'OK' }]
     );
   };

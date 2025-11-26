@@ -2,9 +2,15 @@
 version = 1
 
 [[package]]
+name = "alexandria_math"
+version = "0.3.0"
+source = "git+https://github.com/keep-starknet-strange/alexandria.git?tag=v0.3.0#e3715428c990665afc495b5428ef08ab9a2089cd"
+
+[[package]]
 name = "btcusd_protocol"
 version = "0.1.0"
 dependencies = [
+ "alexandria_math",
  "openzeppelin_access",
  "openzeppelin_security",
  "openzeppelin_token",

@@ -13,11 +13,12 @@ interface Props {
 }
 
 export function YieldCard({ yieldInfo, onHarvest }: Props) {
-  const formatBTC = (value: bigint) => {
+  const formatBTC = (value: bigint | undefined) => {
+    if (!value) return '0.00000000';
     return (Number(value) / 1e8).toFixed(8);
   };
 
-  if (!yieldInfo || yieldInfo.deposited === 0n) {
+  if (!yieldInfo || yieldInfo.pendingYield === 0n) {
     return (
       <View style={styles.card}>
         <Text style={styles.title}>Yield Earnings</Text>
@@ -37,19 +38,19 @@ export function YieldCard({ yieldInfo, onHarvest }: Props) {
       <View style={styles.header}>
         <Text style={styles.title}>Yield Earnings</Text>
         <View style={styles.apyBadge}>
-          <Text style={styles.apyText}>{yieldInfo.apy.toFixed(2)}% APY</Text>
+          <Text style={styles.apyText}>{(yieldInfo.apy / 100).toFixed(2)}% APY</Text>
         </View>
       </View>
 
       <View style={styles.row}>
         <View style={styles.stat}>
-          <Text style={styles.label}>Deposited</Text>
-          <Text style={styles.value}>{formatBTC(yieldInfo.deposited)} wBTC</Text>
+          <Text style={styles.label}>Pending Yield</Text>
+          <Text style={styles.value}>{formatBTC(yieldInfo.pendingYield)} wBTC</Text>
         </View>
         <View style={styles.stat}>
           <Text style={styles.label}>Total Earned</Text>
           <Text style={[styles.value, styles.earned]}>
-            +{formatBTC(yieldInfo.earnedYield)} wBTC
+            +{formatBTC(yieldInfo.cumulativeYield)} wBTC
           </Text>
         </View>
       </View>

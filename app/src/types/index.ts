@@ -5,16 +5,18 @@
 export interface Position {
   collateral: bigint;
   debt: bigint;
-  lastUpdate: number;
-  healthFactor: number;
+  lastUpdate?: number;
+  healthFactor: bigint;
   collateralRatio: number;
-  maxBorrowable: bigint;
+  liquidationPrice: bigint;
+  maxBorrowable?: bigint;
 }
 
 export interface YieldInfo {
-  deposited: bigint;
-  earnedYield: bigint;
+  deposited?: bigint;
+  earnedYield?: bigint;
   pendingYield: bigint;
+  cumulativeYield: bigint;
   apy: number;
   lastHarvest: number;
 }

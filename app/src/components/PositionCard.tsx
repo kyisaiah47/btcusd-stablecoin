@@ -21,10 +21,18 @@ export function PositionCard({ position, btcPrice }: Props) {
     return (Number(value) / 1e18).toFixed(2);
   };
 
-  const getHealthColor = (healthFactor: number) => {
-    if (healthFactor >= 2) return COLORS.success;
-    if (healthFactor >= 1.5) return COLORS.warning;
+  const getHealthColor = (healthFactor: number | bigint) => {
+    const hf = typeof healthFactor === 'bigint' ? Number(healthFactor) / 10000 : healthFactor;
+    if (hf >= 2) return COLORS.success;
+    if (hf >= 1.5) return COLORS.warning;
     return COLORS.danger;
+  };
+
+  const formatHealthFactor = (hf: bigint | number) => {
+    if (typeof hf === 'bigint') {
+      return (Number(hf) / 10000).toFixed(2);
+    }
+    return hf.toFixed(2);
   };
 
   if (!position || position.collateral === 0n) {
@@ -66,7 +74,7 @@ export function PositionCard({ position, btcPrice }: Props) {
         <View style={styles.healthHeader}>
           <Text style={styles.label}>Health Factor</Text>
           <Text style={[styles.healthValue, { color: getHealthColor(position.healthFactor) }]}>
-            {position.healthFactor.toFixed(2)}
+            {formatHealthFactor(position.healthFactor)}
           </Text>
         </View>
         <View style={styles.healthBar}>
@@ -74,16 +82,16 @@ export function PositionCard({ position, btcPrice }: Props) {
             style={[
               styles.healthFill,
               {
-                width: `${Math.min(position.healthFactor / 3 * 100, 100)}%`,
+                width: `${Math.min(Number(position.healthFactor) / 30000 * 100, 100)}%`,
                 backgroundColor: getHealthColor(position.healthFactor)
               }
             ]}
           />
         </View>
         <Text style={styles.healthNote}>
-          {position.healthFactor >= 1.5
+          {Number(position.healthFactor) >= 15000
             ? 'Your position is healthy'
-            : position.healthFactor >= 1.2
+            : Number(position.healthFactor) >= 12000
             ? '⚠️ Consider adding collateral'
             : '🚨 Liquidation risk!'}
         </Text>
@@ -95,8 +103,8 @@ export function PositionCard({ position, btcPrice }: Props) {
           <Text style={styles.value}>{(position.collateralRatio / 100).toFixed(1)}%</Text>
         </View>
         <View style={styles.stat}>
-          <Text style={styles.label}>Max Borrowable</Text>
-          <Text style={styles.value}>{formatUSD(position.maxBorrowable)} BTCUSD</Text>
+          <Text style={styles.label}>Liquidation Price</Text>
+          <Text style={styles.value}>${(Number(position.liquidationPrice) / 1e8).toLocaleString()}</Text>
         </View>
       </View>
     </View>

@@ -95,6 +95,8 @@ pub mod BTCUSDVault {
         total_debt: u256,
         // Configuration
         min_deposit: u256,
+        // Liquidation (Stage 2)
+        liquidator: ContractAddress,
     }
 
     // ============ Events ============
@@ -113,6 +115,8 @@ pub mod BTCUSDVault {
         BTCUSDMinted: BTCUSDMinted,
         BTCUSDBurned: BTCUSDBurned,
         PositionUpdated: PositionUpdated,
+        PositionLiquidated: PositionLiquidated,
+        LiquidatorUpdated: LiquidatorUpdated,
     }
 
     #[derive(Drop, starknet::Event)]
@@ -156,6 +160,23 @@ pub mod BTCUSDVault {
         pub collateral_ratio: u256,
     }
 
+    #[derive(Drop, starknet::Event)]
+    pub struct PositionLiquidated {
+        #[key]
+        pub user: ContractAddress,
+        #[key]
+        pub liquidator: ContractAddress,
+        pub debt_repaid: u256,
+        pub collateral_seized: u256,
+        pub timestamp: u64,
+    }
+
+    #[derive(Drop, starknet::Event)]
+    pub struct LiquidatorUpdated {
+        pub old_liquidator: ContractAddress,
+        pub new_liquidator: ContractAddress,
+    }
+
     // ============ Errors ============
 
     pub mod Errors {
@@ -168,6 +189,9 @@ pub mod BTCUSDVault {
         pub const NO_POSITION: felt252 = 'Vault: no position';
         pub const STALE_PRICE: felt252 = 'Vault: stale price';
         pub const ZERO_PRICE: felt252 = 'Vault: zero price';
+        pub const NOT_LIQUIDATOR: felt252 = 'Vault: not liquidator';
+        pub const NOT_LIQUIDATABLE: felt252 = 'Vault: not liquidatable';
+        pub const SEIZE_TOO_MUCH: felt252 = 'Vault: seize too much';
     }
 
     // ============ Constructor ============
@@ -572,6 +596,75 @@ pub mod BTCUSDVault {
                 self.price_oracle.read(),
                 self.yield_manager.read(),
             )
+        }
+
+        // ============ Liquidation Functions (Stage 2) ============
+
+        fn liquidate(
+            ref self: ContractState,
+            user: ContractAddress,
+            debt_to_repay: u256,
+            collateral_to_seize: u256,
+        ) {
+            self.pausable.assert_not_paused();
+            self.reentrancy.start();
+
+            // Only the authorized liquidator contract can call this
+            let caller = get_caller_address();
+            assert(caller == self.liquidator.read(), Errors::NOT_LIQUIDATOR);
+
+            // Verify position is liquidatable
+            assert(self.is_liquidatable(user), Errors::NOT_LIQUIDATABLE);
+
+            let mut position = self.positions.entry(user).read();
+            assert(debt_to_repay <= position.debt, Errors::INSUFFICIENT_DEBT);
+            assert(collateral_to_seize <= position.collateral, Errors::SEIZE_TOO_MUCH);
+
+            // Update position
+            position.debt = position.debt - debt_to_repay;
+            position.collateral = position.collateral - collateral_to_seize;
+            position.last_update = get_block_timestamp();
+            self.positions.entry(user).write(position);
+
+            // Update global state
+            self.total_debt.write(self.total_debt.read() - debt_to_repay);
+            self.total_collateral.write(self.total_collateral.read() - collateral_to_seize);
+
+            // Burn the BTCUSD that was transferred to the vault by the liquidator
+            let btcusd = IBTCUSDTokenDispatcher { contract_address: self.btcusd_token.read() };
+            btcusd.burn(get_contract_address(), debt_to_repay);
+
+            // Withdraw collateral from yield manager
+            self._withdraw_from_yield_manager(user, collateral_to_seize);
+
+            // Transfer seized collateral to liquidator
+            let wbtc = IERC20Dispatcher { contract_address: self.wbtc_token.read() };
+            wbtc.transfer(caller, collateral_to_seize);
+
+            self
+                .emit(
+                    PositionLiquidated {
+                        user,
+                        liquidator: caller,
+                        debt_repaid: debt_to_repay,
+                        collateral_seized: collateral_to_seize,
+                        timestamp: get_block_timestamp(),
+                    },
+                );
+            self._emit_position_updated(user, position);
+
+            self.reentrancy.end();
+        }
+
+        fn set_liquidator(ref self: ContractState, liquidator: ContractAddress) {
+            self.ownable.assert_only_owner();
+            let old_liquidator = self.liquidator.read();
+            self.liquidator.write(liquidator);
+            self.emit(LiquidatorUpdated { old_liquidator, new_liquidator: liquidator });
+        }
+
+        fn get_liquidator(self: @ContractState) -> ContractAddress {
+            self.liquidator.read()
         }
     }
 

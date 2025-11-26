@@ -15,7 +15,9 @@ import { LIQUIDATION_CONFIG, PROTOCOL } from '../config/index.js';
 import { getContracts, getKeeperAccount, executeTransaction } from '../services/starknet.js';
 import type { PositionWithHealth, LiquidationCandidate, LiquidationResult } from '../types/index.js';
 
-const logger = pino({
+// @ts-ignore - pino ESM typing issue
+const createLogger = pino.default || pino;
+const logger = createLogger({
   name: 'liquidation-bot',
   level: process.env.LOG_LEVEL || 'info',
 });
@@ -276,23 +278,24 @@ class LiquidationBot {
   }
 }
 
-// Run if executed directly
-const bot = new LiquidationBot();
-
-// Handle shutdown gracefully
-process.on('SIGINT', async () => {
-  await bot.stop();
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  await bot.stop();
-  process.exit(0);
-});
-
-bot.start().catch((err) => {
-  logger.error({ err }, 'Failed to start bot');
-  process.exit(1);
-});
-
 export { LiquidationBot };
+
+// Run if executed directly
+if (process.argv[1]?.includes('liquidation-bot')) {
+  const bot = new LiquidationBot();
+
+  process.on('SIGINT', async () => {
+    await bot.stop();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    await bot.stop();
+    process.exit(0);
+  });
+
+  bot.start().catch((err) => {
+    logger.error({ err }, 'Failed to start bot');
+    process.exit(1);
+  });
+}

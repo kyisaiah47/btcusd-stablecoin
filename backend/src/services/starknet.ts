@@ -6,7 +6,9 @@ import { RpcProvider, Account, Contract, Call } from 'starknet';
 import { NETWORK, CONTRACTS, KEEPER_ACCOUNT } from '../config/index.js';
 import pino from 'pino';
 
-const logger = pino({ name: 'starknet' });
+// @ts-ignore - pino ESM typing issue
+const createLogger = pino.default || pino;
+const logger = createLogger({ name: 'starknet' });
 
 // Singleton provider
 let provider: RpcProvider | null = null;
@@ -211,6 +213,7 @@ export async function executeTransaction(calls: Call[]): Promise<string> {
  */
 export async function checkKeeperBalance(): Promise<bigint> {
   const account = getKeeperAccount();
-  const balance = await getProvider().getBalance(account.address);
+  // @ts-ignore - RpcProvider method exists at runtime
+  const balance = await (getProvider() as any).getBalance(account.address);
   return BigInt(balance);
 }

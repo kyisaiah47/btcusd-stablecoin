@@ -126,4 +126,30 @@ pub trait IBTCUSDVault<TContractState> {
     /// Returns the contract addresses used by the vault.
     fn get_addresses(self: @TContractState) -> (ContractAddress, ContractAddress, ContractAddress, ContractAddress);
     // Returns: (wbtc_token, btcusd_token, oracle, yield_manager)
+
+    // ============ Liquidation Functions (Stage 2) ============
+
+    /// Liquidates an undercollateralized position.
+    /// Can only be called by the authorized liquidator contract.
+    ///
+    /// # Arguments
+    /// * `user` - Address of the position owner to liquidate
+    /// * `debt_to_repay` - Amount of BTCUSD debt being repaid by liquidator
+    /// * `collateral_to_seize` - Amount of wBTC collateral to seize
+    ///
+    /// # Requirements
+    /// * Position must be liquidatable (health factor < LIQUIDATION_THRESHOLD)
+    /// * Caller must be the authorized liquidator contract
+    fn liquidate(
+        ref self: TContractState,
+        user: ContractAddress,
+        debt_to_repay: u256,
+        collateral_to_seize: u256,
+    );
+
+    /// Sets the authorized liquidator contract address. Only owner.
+    fn set_liquidator(ref self: TContractState, liquidator: ContractAddress);
+
+    /// Returns the authorized liquidator contract address.
+    fn get_liquidator(self: @TContractState) -> ContractAddress;
 }

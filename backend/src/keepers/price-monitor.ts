@@ -11,11 +11,13 @@
  */
 
 import pino from 'pino';
-import { PRICE_CONFIG, PROTOCOL } from '../config/index.js';
+import { PRICE_CONFIG } from '../config/index.js';
 import { getContracts } from '../services/starknet.js';
 import type { PriceData, PriceAlert } from '../types/index.js';
 
-const logger = pino({
+// @ts-ignore - pino ESM typing issue
+const createLogger = pino.default || pino;
+const logger = createLogger({
   name: 'price-monitor',
   level: process.env.LOG_LEVEL || 'info',
 });
@@ -256,22 +258,24 @@ class PriceMonitor {
   }
 }
 
-// Run if executed directly
-const monitor = new PriceMonitor();
-
-process.on('SIGINT', async () => {
-  await monitor.stop();
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  await monitor.stop();
-  process.exit(0);
-});
-
-monitor.start().catch((err) => {
-  logger.error({ err }, 'Failed to start monitor');
-  process.exit(1);
-});
-
 export { PriceMonitor };
+
+// Run if executed directly
+if (process.argv[1]?.includes('price-monitor')) {
+  const monitor = new PriceMonitor();
+
+  process.on('SIGINT', async () => {
+    await monitor.stop();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    await monitor.stop();
+    process.exit(0);
+  });
+
+  monitor.start().catch((err) => {
+    logger.error({ err }, 'Failed to start monitor');
+    process.exit(1);
+  });
+}

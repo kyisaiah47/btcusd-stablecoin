@@ -16,7 +16,9 @@ import { YIELD_CONFIG } from '../config/index.js';
 import { getContracts, getKeeperAccount, executeTransaction } from '../services/starknet.js';
 import type { UserYield, HarvestResult } from '../types/index.js';
 
-const logger = pino({
+// @ts-ignore - pino ESM typing issue
+const createLogger = pino.default || pino;
+const logger = createLogger({
   name: 'yield-harvester',
   level: process.env.LOG_LEVEL || 'info',
 });
@@ -189,16 +191,14 @@ class YieldHarvester {
   async getProtocolYieldStats() {
     const { yieldManager } = getContracts();
 
-    const [totalDeposits, totalYield, yieldRate] = await Promise.all([
+    const [totalDeposits, totalYield] = await Promise.all([
       yieldManager.get_total_deposits(),
       yieldManager.get_total_yield(),
-      // yieldManager.get_yield_rate(), // If available
     ]);
 
     return {
       totalDeposits: BigInt(totalDeposits.toString()),
       totalYield: BigInt(totalYield.toString()),
-      // apy: Number(yieldRate) / 100,
     };
   }
 
@@ -222,22 +222,24 @@ class YieldHarvester {
   }
 }
 
-// Run if executed directly
-const harvester = new YieldHarvester();
-
-process.on('SIGINT', async () => {
-  await harvester.stop();
-  process.exit(0);
-});
-
-process.on('SIGTERM', async () => {
-  await harvester.stop();
-  process.exit(0);
-});
-
-harvester.start().catch((err) => {
-  logger.error({ err }, 'Failed to start harvester');
-  process.exit(1);
-});
-
 export { YieldHarvester };
+
+// Run if executed directly
+if (process.argv[1]?.includes('yield-harvester')) {
+  const harvester = new YieldHarvester();
+
+  process.on('SIGINT', async () => {
+    await harvester.stop();
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    await harvester.stop();
+    process.exit(0);
+  });
+
+  harvester.start().catch((err) => {
+    logger.error({ err }, 'Failed to start harvester');
+    process.exit(1);
+  });
+}
