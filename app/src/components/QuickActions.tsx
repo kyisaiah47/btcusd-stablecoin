@@ -18,10 +18,10 @@ interface Props {
 }
 
 const actions: Action[] = [
-  { id: 'deposit', label: 'Deposit', icon: '⬇️', color: COLORS.success },
-  { id: 'withdraw', label: 'Withdraw', icon: '⬆️', color: COLORS.warning },
-  { id: 'mint', label: 'Mint', icon: '🪙', color: COLORS.primary },
-  { id: 'burn', label: 'Repay', icon: '🔥', color: COLORS.danger },
+  { id: 'bridge', label: 'Bridge BTC', icon: 'B', color: COLORS.primary },
+  { id: 'deposit', label: 'Deposit', icon: '+', color: COLORS.success },
+  { id: 'mint', label: 'Mint', icon: '$', color: COLORS.secondary },
+  { id: 'withdraw', label: 'Withdraw', icon: '-', color: COLORS.warning },
 ];
 
 export function QuickActions({ onAction }: Props) {

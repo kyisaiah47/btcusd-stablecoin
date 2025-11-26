@@ -9,6 +9,7 @@ pub mod i_yield_manager;
 pub mod i_price_oracle;
 pub mod i_liquidator;
 pub mod i_vesu;
+pub mod i_atomiq;
 
 // Re-export for convenience
 pub use i_btcusd_token::{IBTCUSDToken, IBTCUSDTokenDispatcher, IBTCUSDTokenDispatcherTrait};
@@ -31,4 +32,13 @@ pub use i_vesu::{
     IVesuSingleton, IVesuSingletonDispatcher, IVesuSingletonDispatcherTrait,
     Amount, AmountType, AmountDenomination, ModifyPositionParams, UpdatePositionResponse,
     VesuPosition, AssetConfig,
+};
+
+// Re-export Atomiq interfaces
+pub use i_atomiq::{
+    IAtomiqEscrowManager, IAtomiqEscrowManagerDispatcher, IAtomiqEscrowManagerDispatcherTrait,
+    IAtomiqVault, IAtomiqVaultDispatcher, IAtomiqVaultDispatcherTrait,
+    IBtcOutputClaimHandler, IBtcOutputClaimHandlerDispatcher, IBtcOutputClaimHandlerDispatcherTrait,
+    IBtcRelay, IBtcRelayDispatcher, IBtcRelayDispatcherTrait,
+    Escrow, EscrowStatus, VaultDeposit, SwapRequest,
 };

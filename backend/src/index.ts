@@ -1,10 +1,11 @@
 /**
  * BTCUSD Backend - Main Entry Point
  *
- * Runs all keeper bots:
+ * Runs all keeper bots and services:
  * - Liquidation Bot: Monitors and liquidates unhealthy positions
  * - Yield Harvester: Harvests yield from the yield manager
  * - Price Monitor: Monitors BTC price and sends alerts
+ * - Atomiq Bridge: Monitors BTC deposits and triggers wBTC minting
  */
 
 import pino from 'pino';
@@ -12,6 +13,7 @@ import { LIQUIDATION_CONFIG, YIELD_CONFIG, PRICE_CONFIG, CONTRACTS } from './con
 import { LiquidationBot } from './keepers/liquidation-bot.js';
 import { YieldHarvester } from './keepers/yield-harvester.js';
 import { PriceMonitor } from './keepers/price-monitor.js';
+import { getBridgeService, DEFAULT_ATOMIQ_CONFIG } from './services/atomiq-bridge.js';
 
 // @ts-ignore - pino ESM typing issue
 const createLogger = pino.default || pino;
@@ -49,8 +51,22 @@ async function main() {
     keepers.push({ name: 'price', start: () => monitor.start(), stop: () => monitor.stop() });
   }
 
+  // Initialize Atomiq Bridge service
+  if (DEFAULT_ATOMIQ_CONFIG.enabled) {
+    logger.info('Atomiq Bridge service enabled');
+    const bridgeService = getBridgeService();
+    keepers.push({
+      name: 'atomiq-bridge',
+      start: async () => {
+        await bridgeService.initialize();
+        await bridgeService.startMonitoring();
+      },
+      stop: async () => bridgeService.stopMonitoring(),
+    });
+  }
+
   if (keepers.length === 0) {
-    logger.warn('No keepers enabled! Set LIQUIDATION_KEEPER_ENABLED, YIELD_KEEPER_ENABLED, or PRICE_KEEPER_ENABLED to true');
+    logger.warn('No keepers enabled! Set LIQUIDATION_KEEPER_ENABLED, YIELD_KEEPER_ENABLED, PRICE_KEEPER_ENABLED, or ATOMIQ_BRIDGE_ENABLED to true');
     return;
   }
 
