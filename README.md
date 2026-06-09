@@ -158,6 +158,9 @@ btcusd-stablecoin/
 **Deployed Contracts (Sepolia):**
 - Liquidator: `0x047920e18d296dd5f5da36613a83e3b9badc019cb4e0d59f5fae8af2bae9141c`
 
+
+[![Watch Demo](https://img.shields.io/badge/YouTube-Watch%20Demo-FF0000?style=flat&logo=youtube&logoColor=white)](https://www.youtube.com/watch?v=5ijxs1PgWgM)
+
 ---
 
 ### Stage 3: Real Yield (Vesu Integration) ✅ COMPLETE
